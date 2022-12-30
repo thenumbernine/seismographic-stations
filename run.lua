@@ -102,8 +102,9 @@ netsta = netsta:keys():sort()
 print('#netsta', #netsta)	--#netsta	58488
 
 geturl('query-IU-ANMO-BH1-slist.txt', 'https://service.iris.edu/fdsnws/dataselect/1/query?net=IU&sta=ANMO&loc=00&cha=BH1&start=2010-02-27T06:30:00.000&end=2010-02-27T10:30:00.000&format=geocsv.inline.slist')
+geturl('query-IU-ANMO-BH2-slist.txt', 'https://service.iris.edu/fdsnws/dataselect/1/query?net=IU&sta=ANMO&loc=00&cha=BH2&start=2010-02-27T06:30:00.000&end=2010-02-27T10:30:00.000&format=geocsv.inline.slist')
 --geturl('query-IU-ANMO-BHZ-slist.txt', 'https://service.iris.edu/fdsnws/dataselect/1/query?net=IU&sta=ANMO&loc=00&cha=BHZ&start=2010-02-27T06:30:00.000&end=2010-02-27T10:30:00.000&format=geocsv.inline.slist')
-
+-- hmm yup multiple channels, but only 1 location.
 
 --[[
 http://service.iris.edu/fdsnws/dataselect/1/
@@ -125,5 +126,8 @@ and yeah 3) the time format is "%Y-%m-%dT%H:%M:%S"
 but what is the location?
 is it which of the multiple network+station's that there are?
 nope nevermind, for IU-ANMO there are 3 dif stations, but only location=00 works
+
+how do I tell # of locations?
+and how do I tell # of channels?
 
 --]]
