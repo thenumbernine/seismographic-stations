@@ -6,6 +6,9 @@ local tolua = require 'ext.tolua'
 local string = require 'ext.string'
 local table = require 'ext.table'
 
+file'txt':mkdir()
+file'luon':mkdir()
+
 -- this just caches a file or downloads it
 local function geturl(fn, url)
 	if file(fn):exists() then 
@@ -27,12 +30,12 @@ end
 -- it assumes the first row is # with fields | separated
 -- and all subsequent rows are values | separated
 local function getdata(basename, url)
-	local luonname = basename..'.luon'	-- ok this is just a lua object.  idk if its really LUON, cuz i think that used binary or something.
+	local luonname = 'luon/'..basename..'.luon'	-- ok this is just a lua object.  idk if its really LUON, cuz i think that used binary or something.
 	local rows
 	if file(luonname):exists() then
 		rows = setmetatable(assert(fromlua(file(luonname):read())), table)
 	else
-		local d = geturl(basename..'.txt', url)
+		local d = geturl('txt/'..basename..'.txt', url)
 		rows = string.split(d, '\n')
 		while rows:last() == '' do rows:remove() end
 		if #rows == 0 then
