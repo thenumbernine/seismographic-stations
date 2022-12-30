@@ -57,7 +57,15 @@ local function getdata(basename, url)
 	return rows
 end
 
-local networks = getdata('networks', 'http://service.iris.edu/fdsnws/station/1/query?level=network&format=text&includecomments=true&nodata=404')
+local function stationURL(args)
+	local gets = table.map(args, function(v,k,t) return k..'='..tostring(v), #t+1 end)
+	return 'http://service.iris.edu/fdsnws/station/1/query?'..gets:concat'&'
+end
+
+local networks = getdata(
+	'networks',
+	stationURL{format='text', includecomments=true, nodata=404, level='network'}
+)
 -- ok multiple entries here can have matching .Network
 -- so get all unique ones
 local netsigs = networks
@@ -66,12 +74,56 @@ local netsigs = networks
 	:sort()
 local stations = table()
 for _,nsig in ipairs(netsigs) do
-	print('getting stations for network '..nsig)
+--	print('getting stations for network '..nsig)
 	local thisstation = getdata(
 		'stations-'..nsig,
-		'http://service.iris.edu/fdsnws/station/1/query?net='..nsig..'&level=station&format=text&includecomments=true&nodata=404'
+		stationURL{format='text', includecomments=true, nodata=404, level='station', net=nsig}
 	)
 	stations:append(thisstation)
-	print('...has '..#thisstation..', total so far '..#stations)
+--	print('...has '..#thisstation..', total so far '..#stations)
 end
-print('#stations', #stations)
+print('#stations', #stations)	--#stations	60282
+
+--[[
+-- associate stations by their signature?
+-- but there are multiple stations with matching signatures, even with matching signatures+networks ...
+local stationsForSig = stations:mapi(function(s)
+	return s, s.Station
+end):setmetatable(nil)
+print(tolua(stationsForSig.ANMO))
+--]]
+
+-- number of unique net+sta's:
+local netsta = table()
+for _,s in ipairs(stations) do
+	netsta[s.Network..s.Station] = true
+end
+netsta = netsta:keys():sort()
+print('#netsta', #netsta)	--#netsta	58488
+
+geturl('query-IU-ANMO-BH1-slist.txt', 'https://service.iris.edu/fdsnws/dataselect/1/query?net=IU&sta=ANMO&loc=00&cha=BH1&start=2010-02-27T06:30:00.000&end=2010-02-27T10:30:00.000&format=geocsv.inline.slist')
+--geturl('query-IU-ANMO-BHZ-slist.txt', 'https://service.iris.edu/fdsnws/dataselect/1/query?net=IU&sta=ANMO&loc=00&cha=BHZ&start=2010-02-27T06:30:00.000&end=2010-02-27T10:30:00.000&format=geocsv.inline.slist')
+
+
+--[[
+http://service.iris.edu/fdsnws/dataselect/1/
+ex url: 
+https://service.iris.edu/fdsnws/dataselect/1/query
+?	net=IU
+&	sta=ANMO
+&	loc=00
+&	cha=BHZ
+&	start=2010-02-27T06:30:00.000
+&	end=2010-02-27T10:30:00.000
+&	format=geocsv.inline
+
+but you still have to fix two things:
+1) the row 'Time, Sample' needs to be commented / excluded
+2) the separator is a ", " and not a "\t"
+and yeah 3) the time format is "%Y-%m-%dT%H:%M:%S"
+
+but what is the location?
+is it which of the multiple network+station's that there are?
+nope nevermind, for IU-ANMO there are 3 dif stations, but only location=00 works
+
+--]]
