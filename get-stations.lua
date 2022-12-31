@@ -93,6 +93,7 @@ end):setmetatable(nil)
 print(tolua(stationsForSig.ANMO))
 --]]
 
+--[[
 -- number of unique net+sta's:
 local netsta = table()
 for _,s in ipairs(stations) do
@@ -105,6 +106,7 @@ geturl('query-IU-ANMO-BH1-slist.txt', 'https://service.iris.edu/fdsnws/dataselec
 geturl('query-IU-ANMO-BH2-slist.txt', 'https://service.iris.edu/fdsnws/dataselect/1/query?net=IU&sta=ANMO&loc=00&cha=BH2&start=2010-02-27T06:30:00.000&end=2010-02-27T10:30:00.000&format=geocsv.inline.slist')
 --geturl('query-IU-ANMO-BHZ-slist.txt', 'https://service.iris.edu/fdsnws/dataselect/1/query?net=IU&sta=ANMO&loc=00&cha=BHZ&start=2010-02-27T06:30:00.000&end=2010-02-27T10:30:00.000&format=geocsv.inline.slist')
 -- hmm yup multiple channels, but only 1 location.
+--]]
 
 --[[
 http://service.iris.edu/fdsnws/dataselect/1/
@@ -131,3 +133,5 @@ how do I tell # of locations?
 and how do I tell # of channels?
 
 --]]
+
+return stations
