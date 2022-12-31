@@ -11,3 +11,9 @@ How many locations are there?
 How many channels are there?
 How come these fields don't come up when querying the stations and networks?
 Someone didn't think these things through, or maybe the text format I used just doesn't have all this information.
+
+# Plotting Data
+
+Well I've got the station locations:
+
+![](sensor-locations.png)

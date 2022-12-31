@@ -4,20 +4,31 @@ local charts = require 'geographic-charts'
 local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
+local glreport = require 'gl.report'
 local ig = require 'imgui'
 local wgs84 = charts.WGS84
 
 local stations = require 'get-stations'
 
+for _,s in ipairs(stations) do
+	for _,k in ipairs{'Latitude', 'Longitude', 'Elevation'} do
+		s[k] = tonumber(s[k])
+	end
+end
+
 local App = require 'imguiapp.withorbit'()
 
 App.title = 'seismograph stations'
-App.viewDist = 2
+App.viewDist = 1.6
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
 	gl.glEnable(gl.GL_DEPTH_TEST)
+	gl.glEnable(gl.GL_POINT_SMOOTH)
+	gl.glEnable(gl.GL_BLEND)
+	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 
+glreport'here'
 	self.colorTex = GLTex2D{
 		filename = 'earth-color.png',
 		minFilter = gl.GL_LINEAR,
@@ -131,9 +142,26 @@ function App:update()
 	self.colorTex:unbind(0)
 	self.shader:useNone()
 
+	gl.glDepthMask(gl.GL_FALSE)
+	gl.glPointSize(3)
+	gl.glColor3f(0,0,0)
+	gl.glBegin(gl.GL_POINTS)
+	for _,s in ipairs(stations) do
+		vertex(s.Latitude, s.Longitude, s.Elevation + .1)
+	end
+	gl.glEnd()
+	gl.glPointSize(2)
+	gl.glColor3f(1,0,0)
+	gl.glBegin(gl.GL_POINTS)
+	for _,s in ipairs(stations) do
+		vertex(s.Latitude, s.Longitude, s.Elevation + .2)
+	end
+	gl.glEnd()
+	gl.glPointSize(1)
+	gl.glDepthMask(gl.GL_TRUE)
+
 	App.super.update(self)
 end
-
 
 local weightFields = {
 	'spheroidCoeff',
@@ -172,7 +200,5 @@ function App:updateGUI()
 		end
 	end
 end
-
-
 
 App():run()

@@ -1,5 +1,4 @@
 #!/usr/bin/env lua
-local http = require 'socket.http'
 local file = require 'ext.file'
 local fromlua = require 'ext.fromlua'
 local tolua = require 'ext.tolua'
@@ -16,6 +15,7 @@ local function geturl(fn, url)
 	end
 	print('downloading '..fn..' from '..url)
 	-- [[ pure lua.  no output.
+	local http = require 'socket.http'
 	local d = assert(http.request(url))
 	assert(file(fn):write(d))
 	--]]
