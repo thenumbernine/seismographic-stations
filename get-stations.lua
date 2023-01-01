@@ -5,8 +5,9 @@ local tolua = require 'ext.tolua'
 local string = require 'ext.string'
 local table = require 'ext.table'
 
-file'txt':mkdir()
 file'luon':mkdir()
+file'txt':mkdir()
+file'xml':mkdir()
 
 -- this just caches a file or downloads it
 local function geturl(fn, url)
@@ -29,7 +30,8 @@ end
 -- this interprets the file too
 -- it assumes the first row is # with fields | separated
 -- and all subsequent rows are values | separated
-local function getdata(basename, url)
+-- phasing this out cuz IRIS gives INCOMPLETE data for this format type.
+local function gettextdata(basename, url)
 	local luonname = 'luon/'..basename..'.luon'	-- ok this is just a lua object.  idk if its really LUON, cuz i think that used binary or something.
 	local rows
 	if file(luonname):exists() then
@@ -57,30 +59,77 @@ local function getdata(basename, url)
 	return rows
 end
 
+-- using this insead cuz IRIS is made by boomers still living in the 90s who still use XML
+local function getxmldata(basename, url)
+	local luonname = 'luon/'..basename..'.luon'
+	if file(luonname):exists() then
+		return setmetatable(assert(fromlua(file(luonname):read())), table)
+	else
+		local xml2lua = require 'xml2lua'
+		local xmlhandler = require 'xmlhandler.tree'
+		local d = geturl('xml/'..basename..'.xml', url)
+		local handler = xmlhandler:new()
+		local parser = xml2lua.parser(handler)
+		parser:parse(d)
+		local objs = handler.root 
+		file(luonname):write(tolua(objs))
+		return objs
+	end
+end
+
+
 local function stationURL(args)
 	local gets = table.map(args, function(v,k,t) return k..'='..tostring(v), #t+1 end)
 	return 'http://service.iris.edu/fdsnws/station/1/query?'..gets:concat'&'
 end
 
-local networks = getdata(
+-- bleh I *have* to use XML or else IRIS gives me a simplified version.
+-- smh even JSON is better than XML smh IRIS smh
+local networks = getxmldata(
 	'networks',
-	stationURL{format='text', includecomments=true, nodata=404, level='network'}
+	stationURL{format='xml', includecomments=true, nodata=404, level='network'}
 )
+
 -- ok multiple entries here can have matching .Network
 -- so get all unique ones
-local netsigs = networks
-	:mapi(function(n,_,t) t[n.Network] = true end)
+local netsigs = table(networks.FDSNStationXML.Network)
+	:mapi(function(n,_,t) t[n._attr.code] = true end)
 	:map(function(v,k,t) return k, #t+1 end)
 	:sort()
 local stations = table()
 for _,nsig in ipairs(netsigs) do
 --	print('getting stations for network '..nsig)
-	local thisstation = getdata(
+	local stationInfoForCode = getxmldata(
 		'stations-'..nsig,
-		stationURL{format='text', includecomments=true, nodata=404, level='station', net=nsig}
+		-- ok using loc=01 and no loc produces same results
+		-- what is location?
+		-- how do i find how many locations there are?
+		-- what difference does it make?
+		stationURL{format='xml', includecomments=true, nodata=404, level='station', net=nsig
+			--, loc='*', cha='*' -- makes no dif?
+		}
 	)
-	stations:append(thisstation)
---	print('...has '..#thisstation..', total so far '..#stations)
+	local function handleNetwork(Network)
+		local Stations = Network.Station
+		-- sometimes its not there ...
+		if not Stations then return end
+		-- gah another quirk of xml2lua is if theres multiple tags of the same name it lumps them into an array ...
+		if #Stations > 0 then
+			stations:append(Stations)
+--			print('...has '..#Stations..', total so far '..#stations)
+		else
+			stations:insert(Stations)
+--			print('...has 1 total so far '..#stations)
+		end
+	end
+	local Networks = stationInfoForCode.FDSNStationXML.Network
+	if #Networks > 0 then
+		for _,Network in ipairs(Networks) do
+			handleNetwork(Network)
+		end
+	else
+		handleNetwork(Networks)
+	end
 end
 print('#stations', #stations)	--#stations	60282
 
