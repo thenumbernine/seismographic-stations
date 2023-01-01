@@ -23,3 +23,5 @@ set output "query-IU-ANMO-BH1.svg"
 plot "query-IU-ANMO-BH1-slist.txt" using ($0/20.):1
 set output "query-IU-ANMO-BH2.svg"
 plot "query-IU-ANMO-BH2-slist.txt" using ($0/20.):1
+set output "query-IU-ANMO.svg"
+plot "query-IU-ANMO-slist.txt" using ($0/20.):1

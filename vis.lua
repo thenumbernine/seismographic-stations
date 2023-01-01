@@ -15,12 +15,6 @@ local wgs84 = charts.WGS84
 
 local stations = require 'get-stations'
 
-for _,s in ipairs(stations) do
-	for _,k in ipairs{'Latitude', 'Longitude', 'Elevation'} do
-		s[k] = tonumber(s[k])
-	end
-end
-
 local App = require 'imguiapp.withorbit'()
 
 App.title = 'seismograph stations'
