@@ -352,9 +352,10 @@ uniform float weight_Azimuthal_equidistant;
 uniform float weight_Mollweide;
 
 uniform float playtime;
+uniform float pointSizeBase;
 
 uniform sampler2D dataTex;
-uniform float dataTexSize;	// == maxTextureSize
+uniform int dataTexSize;	// == maxTextureSize
 
 in vec3 vertex;
 
@@ -378,27 +379,33 @@ void main() {
 	// TODO falloff of some kind
 	// at a ortho width of 1 the point size can safely be 1 or so
 	// at ortho width 1e-4 or so it can be 5 or so idk
-	gl_PointSize = 3.;
+	gl_PointSize = pointSizeBase;
 	//gl_PointSize = 5. * projectionMatrix[0].x;
 
 
 	// get the index based on playtime
-	float index = floor(.5 + float(stationTexCoord.x) + playtime * float(stationTexCoord.y));
+	int index = stationTexCoord.x + int(
+		clamp(playtime, 0., 1.) 
+		* float(stationTexCoord.y-1)
+	);
 	// convert it to pixel location / channel
 	// maybe this is better in integers / as a compute shader?
 	// then I don't have to use max texture size too
-	const float numChannels = 4.;
-	float ch = mod(index, numChannels);
+	const int numChannels = 4;
+	int ch = index % numChannels;
 	index -= ch;
 	index /= numChannels;
-	float dx = mod(index, dataTexSize);
+	int dx = index % dataTexSize;
 	index -= dx;
 	index /= dataTexSize;
-	float dy = index;	//should be in bounds 
+	int dy = index;	//should be in bounds 
 	vec4 c = texture(dataTex,
-		vec2(.5 + dx, .5 + dy) / dataTexSize
+		vec2(
+			(.5 + float(dx)),
+			(.5 + float(dy))
+		) / float(dataTexSize)
 	);
-	datav = c[int(ch)];
+	datav = c[ch];
 }
 ]]
 }:concat'\n',
@@ -432,6 +439,7 @@ glreport'here'
 	-- how to decide what size to use?
 	-- for max tex size 16384 and 288000 records we got 17.5 texture rows per record ...
 	-- so if i have to wrap data then why not just pack it and store each data in texture x and y and size
+	-- ok also if I have 288000 values at 20 hz then I have 14400 seconds worth = 240 mins = 4 hr
 	local numChannels = 4
 	local dataImageSize = maxTextureSize	-- hmm this is getting me GL_OUT_OF_MEMORY error
 	-- TODO what can I query to find the max tex memory?
@@ -474,6 +482,7 @@ glreport'here'
 
 print(data.hdr.npts, data.sacfn, data.pixelIndex)--, data.pixelChannel, data.pixelX, data.pixelY)
 				-- ok theres no VertexAttrib2i so here goes
+				-- I should just use attribpointer
 				local vec4i = require 'vec-ffi.vec4i'
 				data.stationTexCoordPtr = vec4i(
 					data.pixelIndex,
@@ -515,6 +524,7 @@ mollweideCoeff = 0
 playtime = 0
 playSpeed = 1
 playing = false
+pointSizeBase = 5
 
 local lastTime = 0
 function App:update()
@@ -574,14 +584,14 @@ function App:update()
 		modelViewMatrix = self.modelViewMatrix.ptr,
 		projectionMatrix = self.projectionMatrix.ptr,
 		playtime = playtime,
+		pointSizeBase = pointSizeBase,
 	}
 	self.dataTex:bind()
 	gl.glDepthMask(gl.GL_FALSE)
 	gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE)
 	-- ok not all stations have data associated with them ...
 	-- maybe I should be cycling thru the data, and then lining up data with stations with lat/lon
-	gl.glUniform1f(self.globeStationPointShader.uniforms.playtime.loc, playtime)
-	gl.glUniform1f(self.globeStationPointShader.uniforms.dataTexSize.loc, self.dataTex.width)
+	gl.glUniform1i(self.globeStationPointShader.uniforms.dataTexSize.loc, self.dataTex.width)
 	gl.glBegin(gl.GL_POINTS)
 	-- [[ draw only the data sensors
 	for _,d in ipairs(datas) do
@@ -684,6 +694,7 @@ function App:updateGUI()
 	end
 	ig.igSameLine()
 	ig.luatableInputFloat('play time', _G, 'playtime')
+	ig.luatableInputFloat('pointSizeBase', _G, 'pointSizeBase')
 end
 
 App():run()
