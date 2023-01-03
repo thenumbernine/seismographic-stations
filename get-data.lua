@@ -1,4 +1,5 @@
 #!/usr/bin/env lua
+-- right now this is used for downloading seismo data
 
 local tolua = require 'ext.tolua'
 local file = require 'ext.file'
@@ -98,7 +99,8 @@ local function tourldate(t)
 end
 
 file'data':mkdir()
-for k,ss in pairs(stationsForSig) do
+for _,k in ipairs(table.keys(stationsForSig):sort()) do
+	local ss = stationsForSig[k]
 	for _,s in ipairs(ss) do
 		local net = s.Network
 		local sta = s.code
@@ -108,14 +110,15 @@ for k,ss in pairs(stationsForSig) do
 		print(net, sta, s.startDate, s.endDate, reqstart, reqend, inbounds)
 		if inbounds then
 			-- [==[
-			geturl('data/query-'..net..'-'..sta..'-slist.txt', irisurl.dataselect{
+			geturl('data/query-'..net..'-'..sta..'-sac.zip', irisurl.dataselect{
 				net = net,
 				sta = sta,
 				loc = '00',
 				cha = '*',
 				start = tourldate(reqstart),
 				['end'] = tourldate(reqend),
-				format = 'geocsv.inline.slist',
+				--format = 'geocsv.inline.slist',
+				format = 'sac.zip',
 			})
 			--]==]
 		end

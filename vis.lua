@@ -19,22 +19,53 @@ local App = require 'imguiapp.withorbit'()
 
 App.title = 'seismograph stations'
 App.viewDist = 1.6
+App.viewOrthoSize = 2	-- TODO assign in glapp.view
+
+local ffi = require 'ffi'
+local int = ffi.new'int[1]'
+local function glget(k)
+	gl.glGetIntegerv(assert(gl[k]), int);
+	return int[0]
+end
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
+	self.view.ortho = true
+	self.view.orthoSize = self.viewOrthoSize
+
 	gl.glEnable(gl.GL_DEPTH_TEST)
 	gl.glEnable(gl.GL_POINT_SMOOTH)
 	gl.glEnable(gl.GL_BLEND)
 	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 
+	local Image = require 'image'
+	--local image = Image'earth-color.png'
+	-- both are too big, max tex size is 16384
+	-- and resizing takes too long (and crashes)
+	--local image = Image'world.topo.bathy.200412.3x21600x10800.jpg'
+	--local image = Image'world.topo.bathy.200412.3x21600x10800.png'
+	-- so just resize offline
+	local image = Image'world.topo.bathy.200412.3x16384x8192.png'
+	local maxTextureSize = glget'GL_MAX_TEXTURE_SIZE'
+	if image.width > maxTextureSize
+	or image.height > maxTextureSize then
+		local timer = require 'ext.timer'
+		timer('resizing', function()
+			image = image:resize(
+				math.min(maxTextureSize, image.width),
+				math.min(maxTextureSize, image.height)
+			)
+		end)
+	end
+
 glreport'here'
 	self.colorTex = GLTex2D{
-		filename = 'earth-color.png',
+		image = image,
 		minFilter = gl.GL_LINEAR,
 		magFilter = gl.GL_LINEAR,
 		generateMipmap = true,
 	}
-	
+
 	self.modelViewMatrix = matrix_ffi.zeros{4,4}
 	self.projectionMatrix = matrix_ffi.zeros{4,4}
 
@@ -283,7 +314,7 @@ void main() {
 		},
 	}
 
-	self.globeColorShader = GLProgram{
+	self.globeStationPointShader = GLProgram{
 		vertexCode = table{
 '#version 460',
 allChartCode,
@@ -298,13 +329,8 @@ uniform float weight_Azimuthal_equidistant;
 uniform float weight_Mollweide;
 
 in vec3 vertex;
-in vec4 color;
-
-out vec4 colorv;
 
 void main() {
-	colorv = color;
-	
 	// expect vertex xyz to be lat lon height
 	// then generate texcoord etc
 	// based on constraints
@@ -315,15 +341,19 @@ void main() {
 			+ weight_Mollweide * chart_Mollweide(vertex);
 
 	gl_Position = projectionMatrix * (modelViewMatrix * vec4(pos, 1.));
+	// TODO falloff of some kind
+	// at a ortho width of 1 the point size can safely be 1 or so
+	// at ortho width 1e-4 or so it can be 5 or so idk
+	gl_PointSize = 3.;
+	//gl_PointSize = 5. * projectionMatrix[0].x;
 }
 ]]
 }:concat'\n',
 		fragmentCode = [[
 #version 460
-in vec4 colorv;
 out vec4 fragColor;
 void main() {
-	fragColor = colorv;
+	fragColor = vec4(1., 0., 0., 1.);
 }
 ]],
 	}
@@ -378,8 +408,8 @@ function App:update()
 		gl.glEnd()
 	end
 	
-	self.globeColorShader:use()
-	self.globeColorShader:setUniforms{
+	self.globeStationPointShader:use()
+	self.globeStationPointShader:setUniforms{
 		weight_WGS84 = spheroidCoeff,
 		weight_cylinder = cylCoeff,
 		weight_Equirectangular = equirectCoeff,
@@ -388,31 +418,21 @@ function App:update()
 		modelViewMatrix = self.modelViewMatrix.ptr,
 		projectionMatrix = self.projectionMatrix.ptr,
 	}
-	-- TODO charts in GLSL so I can put the vertex code in GPU mem
---	gl.glDepthMask(gl.GL_FALSE)
-gl.glDisable(gl.GL_DEPTH_TEST)	
-	gl.glPointSize(3)
-	gl.glVertexAttrib4f(self.globeColorShader.attrs.color.loc, 0, 0, 0, 1)
+	gl.glDepthMask(gl.GL_FALSE)
+	gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE)
 	gl.glBegin(gl.GL_POINTS)
 	for _,s in ipairs(stations) do
-		gl.glVertexAttrib3f(self.globeColorShader.attrs.vertex.loc, s.Latitude, s.Longitude, s.Elevation + 1000)
+		gl.glVertexAttrib3f(self.globeStationPointShader.attrs.vertex.loc, s.Latitude, s.Longitude, s.Elevation + 1e+4)
 	end
 	gl.glEnd()
-	gl.glPointSize(2)
-	gl.glVertexAttrib4f(self.globeColorShader.attrs.color.loc, 1, 0, 0, 1)
-	gl.glBegin(gl.GL_POINTS)
-	for _,s in ipairs(stations) do
-		gl.glVertexAttrib3f(self.globeColorShader.attrs.vertex.loc, s.Latitude, s.Longitude, s.Elevation + 2000)
-	end
-	gl.glEnd()
-	gl.glPointSize(1)
---	gl.glDepthMask(gl.GL_TRUE)
-gl.glEnable(gl.GL_DEPTH_TEST)	
+	gl.glDepthMask(gl.GL_TRUE)
+	gl.glDisable(gl.GL_VERTEX_PROGRAM_POINT_SIZE)
 	
 	self.colorTex:unbind(0)
-	self.globeColorShader:useNone()
+	self.globeStationPointShader:useNone()
 
 	App.super.update(self)
+glreport'here'
 end
 
 local weightFields = {
@@ -424,6 +444,13 @@ local weightFields = {
 }
 
 function App:updateGUI()
+	if ig.igButton'reset view' then
+		self.view.ortho = true
+		self.view.orthoSize = self.viewOrthoSize
+		self.view.angle:set(0,0,0,1)
+		self.view.orbit:set(0,0,0)
+		self.view.pos:set(0, 0, self.viewDist)
+	end
 	ig.luatableInputInt('idivs', _G, 'idivs')
 	ig.luatableInputInt('jdivs', _G, 'jdivs')
 	ig.luatableCheckbox('normalize weights', _G, 'normalizeWeights')
