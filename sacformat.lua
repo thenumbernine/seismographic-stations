@@ -17,21 +17,21 @@ sac.IUNDEF = -12345
 -- #define SUNDEF "-12345  " 
 
 -- definitions of constants for SAC enumerated data values 
-sac.IREAL = 0			-- undocumented              
+sac.IREAL = 0		
 sac.ITIME = 1			-- file: time series data    
 sac.IRLIM = 2			-- file: real&imag spectrum  
 sac.IAMPH = 3			-- file: ampl&phas spectrum  
-sac.IXY = 4			-- file: gen'l x vs y data   
+sac.IXY = 4				-- file: gen'l x vs y data   
 sac.IUNKN = 5			-- x data: unknown type      
-					-- zero time: unknown        
-					-- event type: unknown       
+						-- zero time: unknown        
+						-- event type: unknown       
 sac.IDISP = 6			-- x data: displacement (nm) 
 sac.IVEL = 7			-- x data: velocity (nm/sec) 
 sac.IACC = 8			-- x data: accel (cm/sec/sec)
-sac.IB = 9			-- zero time: start of file  
+sac.IB = 9				-- zero time: start of file  
 sac.IDAY = 10			-- zero time: 0000 of GMT day
-sac.IO = 11			-- zero time: event origin   
-sac.IA = 12			-- zero time: 1st arrival    
+sac.IO = 11				-- zero time: event origin   
+sac.IA = 12				-- zero time: 1st arrival    
 sac.IT0 = 13			-- zero time: user timepick 0
 sac.IT1 = 14			-- zero time: user timepick 1
 sac.IT2 = 15			-- zero time: user timepick 2
@@ -42,20 +42,20 @@ sac.IT6 = 19			-- zero time: user timepick 6
 sac.IT7 = 20			-- zero time: user timepick 7
 sac.IT8 = 21			-- zero time: user timepick 8
 sac.IT9 = 22			-- zero time: user timepick 9
-sac.IRADNV = 23			-- undocumented              
-sac.ITANNV = 24			-- undocumented              
-sac.IRADEV = 25			-- undocumented              
-sac.ITANEV = 26			-- undocumented              
-sac.INORTH = 27			-- undocumented              
-sac.IEAST = 28			-- undocumented              
-sac.IHORZA = 29			-- undocumented              
-sac.IDOWN = 30			-- undocumented              
-sac.IUP = 31			-- undocumented              
-sac.ILLLBB = 32			-- undocumented              
-sac.IWWSN1 = 33			-- undocumented              
-sac.IWWSN2 = 34			-- undocumented              
-sac.IHGLP = 35			-- undocumented              
-sac.ISRO = 36			-- undocumented              
+sac.IRADNV = 23			
+sac.ITANNV = 24			
+sac.IRADEV = 25			
+sac.ITANEV = 26			
+sac.INORTH = 27			
+sac.IEAST = 28			
+sac.IHORZA = 29			
+sac.IDOWN = 30			
+sac.IUP = 31			
+sac.ILLLBB = 32			
+sac.IWWSN1 = 33			
+sac.IWWSN2 = 34			
+sac.IHGLP = 35			
+sac.ISRO = 36			
 
 -- Source types 
 sac.INUCL = 37			-- event type: nuclear shot  
@@ -67,34 +67,34 @@ sac.IPOSTQ = 42			-- event type: aftershock
 sac.ICHEM = 43			-- event type: chemical expl 
 sac.IOTHER = 44			-- event type: other source  
 sac.IQB = 72			-- Quarry Blast or mine expl. confirmed by quarry 
-sac.IQB1 = 73  -- Quarry or mine blast with designed shot information-ripple fired 
-sac.IQB2 = 74  -- Quarry or mine blast with observed shot information-ripple fired 
-sac.IQBX = 75  -- Quarry or mine blast - single shot 
-sac.IQMT = 76  -- Quarry or mining-induced events: tremors and rockbursts 
-sac.IEQ = 77  -- Earthquake 
-sac.IEQ1 = 78  -- Earthquakes in a swarm or aftershock sequence 
-sac.IEQ2 = 79  -- Felt earthquake 
-sac.IME = 80  -- Marine explosion 
-sac.IEX = 81  -- Other explosion 
-sac.INU = 82  -- Nuclear explosion 
-sac.INC = 83  -- Nuclear cavity collapse 
-sac.IO_ = 84  -- Other source of known origin 
-sac.IL = 85  -- Local event of unknown origin 
-sac.IR = 86  -- Regional event of unknown origin 
-sac.IT = 87  -- Teleseismic event of unknown origin 
-sac.IU = 88  -- Undetermined or conflicting information  
-sac.IEQ3 = 89  -- Damaging earthquake 
-sac.IEQ0 = 90  -- Probable earthquake 
-sac.IEX0 = 91  -- Probable explosion 
-sac.IQC = 92  -- Mine collapse 
-sac.IQB0 = 93  -- Probable Mine Blast 
-sac.IGEY = 94  -- Geyser 
-sac.ILIT = 95  -- Light 
-sac.IMET = 96  -- Meteoric Event 
-sac.IODOR = 97  -- Odors 
+sac.IQB1 = 73  			-- Quarry or mine blast with designed shot information-ripple fired 
+sac.IQB2 = 74  			-- Quarry or mine blast with observed shot information-ripple fired 
+sac.IQBX = 75  			-- Quarry or mine blast - single shot 
+sac.IQMT = 76  			-- Quarry or mining-induced events: tremors and rockbursts 
+sac.IEQ = 77  			-- Earthquake 
+sac.IEQ1 = 78  			-- Earthquakes in a swarm or aftershock sequence 
+sac.IEQ2 = 79  			-- Felt earthquake 
+sac.IME = 80  			-- Marine explosion 
+sac.IEX = 81  			-- Other explosion 
+sac.INU = 82  			-- Nuclear explosion 
+sac.INC = 83  			-- Nuclear cavity collapse 
+sac.IO_ = 84  			-- Other source of known origin 
+sac.IL = 85  			-- Local event of unknown origin 
+sac.IR = 86  			-- Regional event of unknown origin 
+sac.IT = 87  			-- Teleseismic event of unknown origin 
+sac.IU = 88  			-- Undetermined or conflicting information  
+sac.IEQ3 = 89  			-- Damaging earthquake 
+sac.IEQ0 = 90  			-- Probable earthquake 
+sac.IEX0 = 91  			-- Probable explosion 
+sac.IQC = 92  			-- Mine collapse 
+sac.IQB0 = 93  			-- Probable Mine Blast 
+sac.IGEY = 94  			-- Geyser 
+sac.ILIT = 95  			-- Light 
+sac.IMET = 96  			-- Meteoric Event 
+sac.IODOR = 97  		-- Odors 
 sac.IOS = 103 			-- Other source: Known origin
 
-					-- data quality: other problm
+						-- data quality: other problm
 sac.IGOOD = 45			-- data quality: good        
 sac.IGLCH = 46			-- data quality: has glitches
 sac.IDROP = 47			-- data quality: has dropouts
@@ -104,27 +104,27 @@ sac.IRLDTA = 49			-- data is real data
 sac.IVOLTS = 50			-- file: velocity (volts)    
 
 -- Magnitude type and source 
-sac.IMB = 52                      -- Bodywave Magnitude */ 
-sac.IMS = 53                      -- Surface Magnitude 
-sac.IML = 54                      -- Local Magnitude  */ 
-sac.IMW = 55                      -- Moment Magnitude 
-sac.IMD = 56                      -- Duration Magnitude 
-sac.IMX = 57                      -- User Defined Magnitude 
-sac.INEIC = 58                      -- INEIC 
-sac.IPDEQ = 59                      -- IPDE 
-sac.IPDEW = 60                      -- IPDE 
-sac.IPDE = 61                      -- IPDE 
+sac.IMB = 52           	-- Bodywave Magnitude */ 
+sac.IMS = 53           	-- Surface Magnitude 
+sac.IML = 54           	-- Local Magnitude  */ 
+sac.IMW = 55           	-- Moment Magnitude 
+sac.IMD = 56           	-- Duration Magnitude 
+sac.IMX = 57           	-- User Defined Magnitude 
+sac.INEIC = 58                      
+sac.IPDEQ = 59                      
+sac.IPDEW = 60                      
+sac.IPDE = 61                      
 
-sac.IISC = 62                      -- IISC 
-sac.IREB = 63                      -- IREB 
-sac.IUSGS = 64                      -- IUSGS 
-sac.IBRK = 65                      -- IBRK 
-sac.ICALTECH = 66                    -- ICALTECH 
-sac.ILLNL = 67                      -- ILLNL 
-sac.IEVLOC = 68                      -- IEVLOC 
-sac.IJSOP = 69                      -- IJSOP 
-sac.IUSER = 70                      -- IUSER 
-sac.IUNKNOWN = 71                    -- IUNKNOWN 
+sac.IISC = 62                      
+sac.IREB = 63                      
+sac.IUSGS = 64                      
+sac.IBRK = 65                      
+sac.ICALTECH = 66                    
+sac.ILLNL = 67                      
+sac.IEVLOC = 68                      
+sac.IJSOP = 69                      
+sac.IUSER = 70                      
+sac.IUNKNOWN = 71                    
 
 ffi.cdef[[
 /* SAC header structure as it exists in binary SAC files */

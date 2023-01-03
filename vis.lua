@@ -28,6 +28,23 @@ local function glget(k)
 	return int[0]
 end
 
+local datas = table()
+local dataDir = 'data'
+for f in file(dataDir):dir() do
+	local fn = dataDir..'/'..f
+	local size = file(fn):attr().size
+	if size > 0 then
+		datas:insert{sacfn=fn}
+	end
+end
+
+local zipIter = require 'zipiter'
+for _,data in ipairs(datas) do
+	for buffer, stats in zipIter(data.sacfn) do
+		data.pts, data.header = readSAC(buffer, stats)
+	end
+end
+
 function App:initGL(...)
 	App.super.initGL(self, ...)
 	self.view.ortho = true
