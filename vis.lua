@@ -1,5 +1,8 @@
 #!/usr/bin/env luajit
+local ffi = require 'ffi'
 local table = require 'ext.table'
+local timer = require 'ext.timer'
+local file = require 'ext.file'
 local charts = require 'geographic-charts'
 local template = require 'template'
 local gl = require 'gl'
@@ -7,7 +10,11 @@ local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
 local glreport = require 'gl.report'
 local ig = require 'imgui'
+local Image = require 'image'
 local matrix_ffi = require 'matrix.ffi'
+local sdl = require 'ffi.sdl'
+local readSAC = require 'readsac'
+local zipIter = require 'zipiter'
 
 matrix_ffi.real = 'float'	-- default matrix_ffi type
 
@@ -21,29 +28,13 @@ App.title = 'seismograph stations'
 App.viewDist = 1.6
 App.viewOrthoSize = 2	-- TODO assign in glapp.view
 
-local ffi = require 'ffi'
 local int = ffi.new'int[1]'
 local function glget(k)
 	gl.glGetIntegerv(assert(gl[k]), int);
 	return int[0]
 end
 
-local datas = table()
-local dataDir = 'data'
-for f in file(dataDir):dir() do
-	local fn = dataDir..'/'..f
-	local size = file(fn):attr().size
-	if size > 0 then
-		datas:insert{sacfn=fn}
-	end
-end
-
-local zipIter = require 'zipiter'
-for _,data in ipairs(datas) do
-	for buffer, stats in zipIter(data.sacfn) do
-		data.pts, data.header = readSAC(buffer, stats)
-	end
-end
+local datas
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -55,18 +46,19 @@ function App:initGL(...)
 	gl.glEnable(gl.GL_BLEND)
 	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 
-	local Image = require 'image'
 	--local image = Image'earth-color.png'
 	-- both are too big, max tex size is 16384
 	-- and resizing takes too long (and crashes)
 	--local image = Image'world.topo.bathy.200412.3x21600x10800.jpg'
 	--local image = Image'world.topo.bathy.200412.3x21600x10800.png'
 	-- so just resize offline
-	local image = Image'world.topo.bathy.200412.3x16384x8192.png'
+	local image
+	timer('loading earth texture', function()
+		image = Image'world.topo.bathy.200412.3x16384x8192.png'
+	end)
 	local maxTextureSize = glget'GL_MAX_TEXTURE_SIZE'
 	if image.width > maxTextureSize
 	or image.height > maxTextureSize then
-		local timer = require 'ext.timer'
 		timer('resizing', function()
 			image = image:resize(
 				math.min(maxTextureSize, image.width),
@@ -374,6 +366,54 @@ void main() {
 }
 ]],
 	}
+
+
+	datas = table()
+	local dataDir = 'data'
+	for f in file(dataDir):dir() do
+		local fn = dataDir..'/'..f
+		local size = file(fn):attr().size
+		if size > 0 then
+			datas:insert{sacfn=fn}
+		end
+	end
+
+	-- row i = datas[i], col j = time j
+	-- how to decide what size to use?
+	local dataImage = Image(288000, #datas, 1, 'float')
+	-- for max tex size 16384 and 288000 records we got 17.5 texture rows per record ...
+	-- so if i have to wrap data then why not just pack it and store each data in texture x and y and size
+
+	timer('reading data', function()
+		for row,data in ipairs(datas) do
+			for buffer, stats in zipIter(data.sacfn) do
+				data.pts, data.hdr = readSAC(buffer, stats)
+				data.hdr = data.hdr[0]	-- ref instead of ptr
+				-- data.pts is data.hdr.npts in size
+	print(data.hdr.npts, data.sacfn)
+				if data.hdr.npts ~= dataImage.width then
+					local rowimg = Image(data.hdr.npts, 1, 1, 'float')
+					ffi.copy(rowimg.buffer, data.pts, rowimg.width)
+					rowimg:resize(dataImage.width, 1)
+					ffi.copy(
+						dataImage.buffer + (row-1) * dataImage.width,
+						rowimg.buffer,
+						ffi.sizeof'float' * dataImage.width)
+				else
+					assert(row >= 1 and row <= dataImage.height)
+					ffi.copy(
+						dataImage.buffer + dataImage.width * (row-1),
+						data.pts,
+						ffi.sizeof'float' * dataImage.width)
+				end
+			end
+		end
+	end)
+
+	timer('writing', function()
+		dataImage:normalize():save'dataimage.png'
+	end)
+
 end
 
 idivs = 100
@@ -384,8 +424,16 @@ cylCoeff = 0
 equirectCoeff = 1
 aziequiCoeff = 0
 mollweideCoeff = 0
+playtime = 0
+playSpeed = 1
+playing = false
 
+local lastTime = 0
 function App:update()
+	local thisTime = sdl.SDL_GetTicks() * 1e-3
+	local dt = thisTime - lastTime
+	lastTime = thisTime
+	
 	gl.glClearColor(0, 0, 0, 1)
 	gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
 	gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, self.modelViewMatrix.ptr)
@@ -448,6 +496,14 @@ function App:update()
 	self.colorTex:unbind(0)
 	self.globeStationPointShader:useNone()
 
+	if playing then
+		playtime = playtime + dt * playSpeed
+		if playtime > 1 then
+			playtime = 0
+			playing = false
+		end
+	end
+
 	App.super.update(self)
 glreport'here'
 end
@@ -495,6 +551,18 @@ function App:updateGUI()
 			end
 		end
 	end
+	ig.luatableInputFloat('play speed', _G, 'playSpeed')
+	if playing then
+		if ig.igButton'stop' then
+			playing = false
+		end
+	else
+		if ig.igButton'play' then
+			playing = true
+		end
+	end
+	ig.igSameLine()
+	ig.luatableInputFloat('play time', _G, 'playtime')
 end
 
 App():run()

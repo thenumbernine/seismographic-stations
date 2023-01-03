@@ -29,8 +29,8 @@ end
 
 local alldata = table()
 for buffer, stats in zipIter(fn) do
-	local data, header = readSAC(buffer, stats)
-	alldata:insert(range(header[0].npts):mapi(function(i)
+	local data, hdr = readSAC(buffer, stats)
+	alldata:insert(range(hdr[0].npts):mapi(function(i)
 		return data[i-1]
 	end))
 end
