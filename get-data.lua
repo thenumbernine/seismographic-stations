@@ -22,9 +22,9 @@ print(tolua(stationsForSig.ANMO))
 
 -- [[
 -- number of unique net+sta's:
-local stationsForSig = table()
+local stationsForSig = {}
 for _,s in ipairs(stations) do
-	local k = s.Network..' '..s.code
+	local k = s.Network..'-'..s.code
 	stationsForSig[k] = stationsForSig[k] or table()
 	stationsForSig[k]:insert(s)
 end
@@ -33,7 +33,7 @@ for k,v in pairs(stationsForSig) do
 	if #v > 1 then print(k, #v) end
 end
 --]=]
-local stationsForSigKeys = stationsForSig:keys():sort()
+local stationsForSigKeys = table.keys(stationsForSig):sort()
 print('#stationsForSigKeys', #stationsForSigKeys)	--#stationsForSigKeys	58488 ... but we have 60282 stations ... where did 1794 stations go?  how can we possibly access their data if the stations identification network-name+station-name is redundant?
 --]]
 -- so how in the world can we pick between hundreds of channels when we can only specify 3 letters to pick the channel?

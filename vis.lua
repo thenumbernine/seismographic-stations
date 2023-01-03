@@ -22,6 +22,13 @@ local wgs84 = charts.WGS84
 
 local stations = require 'get-stations'
 
+local stationsForSig = {}
+for _,s in ipairs(stations) do
+	local k = s.Network..'-'..s.code
+	stationsForSig[k] = stationsForSig[k] or table()
+	stationsForSig[k]:insert(s)
+end
+
 local App = require 'imguiapp.withorbit'()
 
 App.title = 'seismograph stations'
@@ -35,6 +42,7 @@ local function glget(k)
 end
 
 local datas
+local maxTextureSize 
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -56,7 +64,7 @@ function App:initGL(...)
 	timer('loading earth texture', function()
 		image = Image'world.topo.bathy.200412.3x16384x8192.png'
 	end)
-	local maxTextureSize = glget'GL_MAX_TEXTURE_SIZE'
+	maxTextureSize = glget'GL_MAX_TEXTURE_SIZE'
 	if image.width > maxTextureSize
 	or image.height > maxTextureSize then
 		timer('resizing', function()
@@ -74,6 +82,9 @@ glreport'here'
 		magFilter = gl.GL_LINEAR,
 		generateMipmap = true,
 	}
+glreport'here'
+	GLTex2D:unbind()
+glreport'here'
 
 	self.modelViewMatrix = matrix_ffi.zeros{4,4}
 	self.projectionMatrix = matrix_ffi.zeros{4,4}
@@ -322,6 +333,9 @@ void main() {
 			colorTex = 0,
 		},
 	}
+glreport'here'
+	self.globeTexShader:useNone()
+glreport'here'
 
 	self.globeStationPointShader = GLProgram{
 		vertexCode = table{
@@ -337,7 +351,17 @@ uniform float weight_Equirectangular;
 uniform float weight_Azimuthal_equidistant;
 uniform float weight_Mollweide;
 
+uniform float playtime;
+
+uniform sampler2D dataTex;
+uniform float dataTexSize;	// == maxTextureSize
+
 in vec3 vertex;
+
+// (index, size) in the dataTex
+in ivec2 stationTexCoord;
+
+out float datav;
 
 void main() {
 	// expect vertex xyz to be lat lon height
@@ -348,25 +372,51 @@ void main() {
 			+ weight_Equirectangular * chart_Equirectangular(vertex)
 			+ weight_Azimuthal_equidistant * chart_Azimuthal_equidistant(vertex)
 			+ weight_Mollweide * chart_Mollweide(vertex);
-
 	gl_Position = projectionMatrix * (modelViewMatrix * vec4(pos, 1.));
+
+
 	// TODO falloff of some kind
 	// at a ortho width of 1 the point size can safely be 1 or so
 	// at ortho width 1e-4 or so it can be 5 or so idk
 	gl_PointSize = 3.;
 	//gl_PointSize = 5. * projectionMatrix[0].x;
+
+
+	// get the index based on playtime
+	float index = floor(.5 + float(stationTexCoord.x) + playtime * float(stationTexCoord.y));
+	// convert it to pixel location / channel
+	// maybe this is better in integers / as a compute shader?
+	// then I don't have to use max texture size too
+	const float numChannels = 4.;
+	float ch = mod(index, numChannels);
+	index -= ch;
+	index /= numChannels;
+	float dx = mod(index, dataTexSize);
+	index -= dx;
+	index /= dataTexSize;
+	float dy = index;	//should be in bounds 
+	vec4 c = texture(dataTex,
+		vec2(.5 + dx, .5 + dy) / dataTexSize
+	);
+	datav = c[int(ch)];
 }
 ]]
 }:concat'\n',
 		fragmentCode = [[
 #version 460
+in float datav;
 out vec4 fragColor;
 void main() {
-	fragColor = vec4(1., 0., 0., 1.);
+	fragColor = vec4(datav, .5, -datav, 1.);
 }
 ]],
+		uniforms = {
+			dataTex = 0,
+		},
 	}
-
+glreport'here'
+	self.globeStationPointShader:useNone()
+glreport'here'
 
 	datas = table()
 	local dataDir = 'data'
@@ -380,40 +430,78 @@ void main() {
 
 	-- row i = datas[i], col j = time j
 	-- how to decide what size to use?
-	local dataImage = Image(288000, #datas, 1, 'float')
 	-- for max tex size 16384 and 288000 records we got 17.5 texture rows per record ...
 	-- so if i have to wrap data then why not just pack it and store each data in texture x and y and size
-
+	local numChannels = 4
+	local dataImageSize = maxTextureSize	-- hmm this is getting me GL_OUT_OF_MEMORY error
+	-- TODO what can I query to find the max tex memory?
+	local dataImageSize = 8192
+	local dataImage = Image(dataImageSize, dataImageSize, numChannels, 'float')
+	local indexmax = dataImageSize * dataImageSize * numChannels
+	local index = 0
 	timer('reading data', function()
 		for row,data in ipairs(datas) do
 			for buffer, stats in zipIter(data.sacfn) do
 				data.pts, data.hdr = readSAC(buffer, stats)
 				data.hdr = data.hdr[0]	-- ref instead of ptr
 				-- data.pts is data.hdr.npts in size
-	print(data.hdr.npts, data.sacfn)
-				if data.hdr.npts ~= dataImage.width then
-					local rowimg = Image(data.hdr.npts, 1, 1, 'float')
-					ffi.copy(rowimg.buffer, data.pts, rowimg.width)
-					rowimg:resize(dataImage.width, 1)
-					ffi.copy(
-						dataImage.buffer + (row-1) * dataImage.width,
-						rowimg.buffer,
-						ffi.sizeof'float' * dataImage.width)
-				else
-					assert(row >= 1 and row <= dataImage.height)
-					ffi.copy(
-						dataImage.buffer + dataImage.width * (row-1),
-						data.pts,
-						ffi.sizeof'float' * dataImage.width)
+				if index + data.hdr.npts >= indexmax then
+					error("ran out of pixels in our seismo dataImage")
 				end
+				data.pixelIndex = index
+				--[[ don't really need this.
+				local i = index
+				data.pixelChannel = i % numChannels
+				i = (i - data.pixelChannel) / numChannels
+				data.pixelX = i % dataImageSize
+				i = (i - data.pixelX) / dataImageSize
+				data.pixelY = i
+				assert(data.pixelY < dataImageSize)
+				--]]
+				ffi.copy(
+					dataImage.buffer + index,
+					data.pts,
+					ffi.sizeof'float' * data.hdr.npts)
+				index = index + data.hdr.npts
+				
+				-- get station info associated with data
+				-- use the first station
+				local sig = data.sacfn:match('^'..dataDir..'/query%-(.*)%-sac%.zip$')
+				assert(sig, "couldn't get sig from file")
+				local s = stationsForSig[sig]
+				assert(#s > 0, "couldn't find a station for sig "..sig)
+				data.station = s[1]
+
+print(data.hdr.npts, data.sacfn, data.pixelIndex)--, data.pixelChannel, data.pixelX, data.pixelY)
+				-- ok theres no VertexAttrib2i so here goes
+				local vec4i = require 'vec-ffi.vec4i'
+				data.stationTexCoordPtr = vec4i(
+					data.pixelIndex,
+					data.hdr.npts,
+					0,
+					0
+				)
 			end
 		end
 	end)
-
+	--[[ this doesn't show anything useful and takes too long so ...
 	timer('writing', function()
 		dataImage:normalize():save'dataimage.png'
 	end)
-
+	--]]
+print('dataImage size', dataImage.width, dataImage.height)
+glreport'here'
+	self.dataTex = GLTex2D{
+		image = dataImage,
+		format = gl.GL_RGBA,
+		type = gl.GL_FLOAT,
+		internalFormat = gl.GL_RGBA32F,
+		minFilter = gl.GL_NEAREST,
+		magFilter = gl.GL_NEAREST,
+	}
+glreport'here'
+	GLTex2D:unbind()
+glreport'here'
 end
 
 idivs = 100
@@ -448,7 +536,7 @@ function App:update()
 		modelViewMatrix = self.modelViewMatrix.ptr,
 		projectionMatrix = self.projectionMatrix.ptr,
 	}
-	self.colorTex:bind(0)
+	self.colorTex:bind()
 	gl.glVertexAttrib4f(self.globeTexShader.attrs.color.loc, 1, 1, 1, 1)
 	for j=0,jdivs-1 do
 		gl.glBegin(gl.GL_TRIANGLE_STRIP)
@@ -472,7 +560,10 @@ function App:update()
 		end
 		gl.glEnd()
 	end
-	
+	self.colorTex:unbind()
+	self.globeTexShader:useNone()
+
+-- [==[
 	self.globeStationPointShader:use()
 	self.globeStationPointShader:setUniforms{
 		weight_WGS84 = spheroidCoeff,
@@ -482,19 +573,49 @@ function App:update()
 		weight_Mollweide = mollweideCoeff,
 		modelViewMatrix = self.modelViewMatrix.ptr,
 		projectionMatrix = self.projectionMatrix.ptr,
+		playtime = playtime,
 	}
+	self.dataTex:bind()
 	gl.glDepthMask(gl.GL_FALSE)
 	gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE)
+	-- ok not all stations have data associated with them ...
+	-- maybe I should be cycling thru the data, and then lining up data with stations with lat/lon
+	gl.glUniform1f(self.globeStationPointShader.uniforms.playtime.loc, playtime)
+	gl.glUniform1f(self.globeStationPointShader.uniforms.dataTexSize.loc, self.dataTex.width)
 	gl.glBegin(gl.GL_POINTS)
-	for _,s in ipairs(stations) do
-		gl.glVertexAttrib3f(self.globeStationPointShader.attrs.vertex.loc, s.Latitude, s.Longitude, s.Elevation + 1e+4)
+	-- [[ draw only the data sensors
+	for _,d in ipairs(datas) do
+		gl.glVertexAttrib4iv(
+			self.globeStationPointShader.attrs.stationTexCoord.loc,
+			d.stationTexCoordPtr.s
+		)
+		local s = d.station
+		gl.glVertexAttrib3f(
+			self.globeStationPointShader.attrs.vertex.loc,
+			s.Latitude,
+			s.Longitude,
+			s.Elevation + 1e+4
+		)
 	end
+	--]]
+	--[[ draw all stations
+	for _,s in ipairs(stations) do
+		gl.glVertexAttrib2f(self.globeStationPointShader.attrs.stationTexCoord.loc, 0, 0)
+		gl.glVertexAttrib3f(
+			self.globeStationPointShader.attrs.vertex.loc,
+			s.Latitude,
+			s.Longitude,
+			s.Elevation + 1e+4
+		)
+	end
+	--]]
 	gl.glEnd()
 	gl.glDepthMask(gl.GL_TRUE)
 	gl.glDisable(gl.GL_VERTEX_PROGRAM_POINT_SIZE)
 	
-	self.colorTex:unbind(0)
+	self.dataTex:unbind()
 	self.globeStationPointShader:useNone()
+--]==]
 
 	if playing then
 		playtime = playtime + dt * playSpeed
