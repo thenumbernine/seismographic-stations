@@ -54,7 +54,29 @@ local function readSAC(buffer, stats)
 
 --print('got '..hdr[0].npts..' pts')
 
-	return data, hdr
+	local startTime = os.time{
+		year = hdr.nzyear,
+		month = 1,
+		day = 1,
+		hour = hdr.nzhour,
+		min = hdr.nzmin,
+		sec = hdr.nzsec,
+		--msec = hdr.nzmsec,	-- hmm, msec accurate dates ...
+	}
+		+ 60 * 60 * 24 * hdr.nzjday	-- can't use yday with os.time, only os.date, so gotta offset it here
+		+ hdr.nzmsec / 1000
+	-- ok so theres no end-duration ...
+	-- and i dont see a frequency or hz field ...
+	-- so how do i find the end date?
+	-- ahhh "delta" of course that means "delta-time"
+	local endTime = startTime + hdr.delta * hdr.npts
+
+	return {
+		data = data,
+		hdr = hdr,
+		startTime = startTime,
+		endTime = endTime,
+	}
 end
 
 return readSAC

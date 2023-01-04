@@ -21,8 +21,8 @@ local wgs84 = charts.WGS84
 
 local readSAC = require 'readsac'
 local zipIter = require 'zipiter'
-local stations = require 'get-stations'
 
+local stations = require 'get-stations'
 local stationsForSig = {}
 for _,s in ipairs(stations) do
 	local k = s.Network..'-'..s.code
@@ -286,8 +286,12 @@ glreport'here'
 		local totalNumPts = 0
 		for _,data in ipairs(datas) do
 			for buffer, stats in zipIter(data.sacfn) do
-				data.pts, data.hdr = readSAC(buffer, stats)
-				data.hdr = data.hdr[0]	-- ref instead of ptr
+				local sac = readSAC(buffer, stats)
+				-- TODO use 'sac' as the obj so i have its metamethods based on .hdr
+				data.pts = sac.data
+				data.hdr = sac.hdr[0]	-- ref instead of ptr
+				data.startTime = sac.startTime
+				data.endTime = sac.endTime
 				totalNumPts = totalNumPts + data.hdr.npts
 				-- but wait, I'm just drawing one sensor per station, so why pick any more than one?
 				if data.hdr.npts > 0 then break end
@@ -315,24 +319,8 @@ glreport'here'
 			assert(#s > 0, "couldn't find a station for sig "..sig)
 			data.station = s[1]
 
-			local startTime = os.time{
-				year = hdr.nzyear,
-				month = 1,
-				day = 1,
-				hour = hdr.nzhour,
-				min = hdr.nzmin,
-				sec = hdr.nzsec,
-				--msec = hdr.msec,	-- hmm, msec accurate dates ...
-			}
-				+ 60 * 60 * 24 * hdr.nzjday	-- can't use yday with os.time, only os.date, so gotta offset it here
-			-- ok so theres no end-duration ...
-			-- and i dont see a frequency or hz field ...
-			-- so how do i find the end date?
-			-- ahhh "delta" of course that means "delta-time"
-			local endTime = math.floor(startTime + hdr.delta * hdr.npts)
-			data.startTime = startTime
-			data.endTime = endTime
-
+			local startTime = math.floor(data.startTime)
+			local endTime = math.floor(data.endTime)
 			totalStartTime = totalStartTime and math.min(startTime, totalStartTime) or startTime
 			totalEndTime = totalEndTime and math.max(endTime, totalEndTime) or endTime
 
