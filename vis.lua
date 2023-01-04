@@ -3,23 +3,24 @@ local ffi = require 'ffi'
 local table = require 'ext.table'
 local timer = require 'ext.timer'
 local file = require 'ext.file'
-local charts = require 'geographic-charts'
-local template = require 'template'
 local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
+local GLShaderStorageBuffer = require 'gl.shaderstoragebuffer'
 local glreport = require 'gl.report'
 local ig = require 'imgui'
 local Image = require 'image'
-local matrix_ffi = require 'matrix.ffi'
 local sdl = require 'ffi.sdl'
-local readSAC = require 'readsac'
-local zipIter = require 'zipiter'
 
+local matrix_ffi = require 'matrix.ffi'
 matrix_ffi.real = 'float'	-- default matrix_ffi type
 
+local charts = require 'geographic-charts'
+local allChartCode = require 'geographic-charts.code'
 local wgs84 = charts.WGS84
 
+local readSAC = require 'readsac'
+local zipIter = require 'zipiter'
 local stations = require 'get-stations'
 
 local stationsForSig = {}
@@ -43,6 +44,8 @@ end
 
 local datas
 local maxTextureSize 
+local totalStartTime
+local totalEndTime
 
 function App:initGL(...)
 	App.super.initGL(self, ...)
@@ -54,15 +57,15 @@ function App:initGL(...)
 	gl.glEnable(gl.GL_BLEND)
 	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 
-	--local image = Image'earth-color.png'
 	-- both are too big, max tex size is 16384
 	-- and resizing takes too long (and crashes)
-	--local image = Image'world.topo.bathy.200412.3x21600x10800.jpg'
-	--local image = Image'world.topo.bathy.200412.3x21600x10800.png'
 	-- so just resize offline
 	local image
 	timer('loading earth texture', function()
-		image = Image'world.topo.bathy.200412.3x16384x8192.png'
+		image = Image'earth-color.png'
+		--image = Image'world.topo.bathy.200412.3x21600x10800.jpg'
+		--image = Image'world.topo.bathy.200412.3x21600x10800.png'
+		--image = Image'world.topo.bathy.200412.3x16384x8192.png'
 	end)
 	maxTextureSize = glget'GL_MAX_TEXTURE_SIZE'
 	if image.width > maxTextureSize
@@ -88,189 +91,6 @@ glreport'here'
 
 	self.modelViewMatrix = matrix_ffi.zeros{4,4}
 	self.projectionMatrix = matrix_ffi.zeros{4,4}
-
-	local ModuleSet = require 'modules'
-	self.modules = ModuleSet()
-	self.modules:addFromMarkup(template[[
-//// MODULE_NAME: M_PI
-const float M_PI = <?=math.pi?>;
-
-//// MODULE_NAME: rad
-//// MODULE_DEPENDS: M_PI
-float rad(float d) {
-	return d * M_PI / 180.;
-}
-
-//// MODULE_NAME: perp2
-vec2 perp2(vec2 a) {
-	return vec2(-a.y, a.x);
-}
-
-//// MODULE_NAME: isfinite
-bool isfinite(float x) {
-	return !(isinf(x) || isnan(x));
-}
-]])
-	local code_WGS84 = [[
-//// MODULE_NAME: chart_WGS84
-//// MODULE_DEPENDS: M_PI perp2 rad
-
-const float WGS84_a = 6378137.;		// equatorial radius
-const float WGS84_b = 6356752.3142;	// polar radius
-const float WGS84_esq = 1. - WGS84_b * WGS84_b / (WGS84_a * WGS84_a);
-const float WGS84_e = sqrt(WGS84_esq);
-const float WGS84_flattening = 1. - WGS84_b / WGS84_a;
-const float WGS84_inverseFlattening = 298.257223563;
-const float WGS84_eccentricitySquared = (2. * WGS84_inverseFlattening - 1.) / (WGS84_inverseFlattening * WGS84_inverseFlattening);
-		
-float WGS84_calc_N(
-	float sinTheta
-) {
-	float denom = sqrt(1. - WGS84_eccentricitySquared * sinTheta * sinTheta);
-	return WGS84_a / denom;
-}
-
-vec3 chart_WGS84(vec3 x) {
-	float lat = x.x;
-	float lon = x.y;
-	float height = x.z;
-
-	float phi = rad(lon);		// spherical φ
-	float theta = rad(lat);		// spherical inclination angle (not azumuthal θ)
-	float cosTheta = cos(theta);
-	float sinTheta = sin(theta);
-	
-	float N = WGS84_calc_N(sinTheta);
-	
-	float NPlusH = N + height;
-	vec3 y = vec3(
-		NPlusH * cosTheta * cos(phi),
-		NPlusH * cosTheta * sin(phi),
-		(N * (1. - WGS84_eccentricitySquared) + height) * sinTheta
-	);
-	// at this point we're in meters, matching the geographic-charts code
-	// but now I'm going to transform further to match the seismographic-visualization / geo-center-earth code
-	y /= WGS84_a;			//convert from meters to normalized coordinates
-	y.yz = -perp2(y.yz);	//rotate back so y is up
-	y.xz = perp2(y.xz);		//now rotate so prime meridian is along -z instead of +x
-	return y;
-}
-]]
-	self.modules:addFromMarkup(code_WGS84)
-	
-	local code_cylinder = [[
-//// MODULE_NAME: chart_cylinder
-//// MODULE_DEPENDS: perp2 rad chart_WGS84
-
-vec3 chart_cylinder(vec3 latLonHeight) {
-	float lat = latLonHeight.x;
-	float lon = latLonHeight.y;
-	float height = latLonHeight.z;
-	float latrad = rad(lat);
-	float lonrad = rad(lon);
-	float r = WGS84_a + height;
-	float x = r * cos(lonrad);
-	float y = r * sin(lonrad);
-	float z = r * latrad;
-	vec3 cartpos = vec3(x, y, z);
-	// end of geographic-charts, beginning of vis aligning stuff
-	cartpos /= WGS84_a;
-	cartpos.yz = -perp2(cartpos.yz);	//rotate back so cartpos is up
-	cartpos.xz = perp2(cartpos.xz);		//now rotate so prime meridian is along -z instead of +x
-	return cartpos;
-}
-]]
-	self.modules:addFromMarkup(code_cylinder)
-
-	-- TODO instead of making one chart depend on another, put the WGS84 constants in one place
-	local code_Equirectangular = [[
-//// MODULE_NAME: chart_Equirectangular
-//// MODULE_DEPENDS: M_PI rad chart_WGS84
-
-const float Equirectangular_R = 2. / M_PI;
-const float Equirectangular_lambda0 = 0.;
-const float Equirectangular_phi0 = 0.;
-const float Equirectangular_phi1 = 0.;
-const float cos_Equirectangular_phi1 = cos(Equirectangular_phi1);
-vec3 chart_Equirectangular(vec3 latLonHeight) {
-	float lat = latLonHeight.x;
-	float lon = latLonHeight.y;
-	float height = latLonHeight.z;
-	float latrad = rad(lat);
-	float lonrad = rad(lon);
-	float x = Equirectangular_R * (lonrad - Equirectangular_lambda0) * cos_Equirectangular_phi1;
-	float y = Equirectangular_R * (latrad - Equirectangular_phi0);
-	float z = height / WGS84_a;
-	return vec3(x,y,z);
-}
-]]
-	self.modules:addFromMarkup(code_Equirectangular)
-
-	local code_Azimuthal_equidistant = [[
-//// MODULE_NAME: chart_Azimuthal_equidistant 
-//// MODULE_DEPENDS: M_PI rad chart_WGS84
-
-vec3 chart_Azimuthal_equidistant(vec3 latLonHeight) {
-	float lat = latLonHeight.x;
-	float lon = latLonHeight.y;
-	float height = latLonHeight.z;
-	float latrad = rad(lat);
-	float lonrad = rad(lon);
-	float azimuthal = M_PI / 2. - latrad;
-	float x = -sin(lonrad + M_PI) * azimuthal;
-	float y = cos(lonrad + M_PI) * azimuthal;
-	float z = height / WGS84_a;
-	return vec3(x,y,z);
-}
-]]
-	self.modules:addFromMarkup(code_Azimuthal_equidistant)
-	
-	local code_Mollweide = [[
-//// MODULE_NAME: chart_Mollweide
-//// MODULE_DEPENDS: M_PI rad isfinite chart_WGS84
-
-const float M_SQRT_2 = sqrt(2.);
-const float M_SQRT_8 = sqrt(8.);
-const float Mollweide_R = M_PI / 4.;
-const float Mollweide_lambda0 = 0.;	// in degrees
-
-vec3 chart_Mollweide(vec3 latLonHeight) {
-	float lat = latLonHeight.x;
-	float lon = latLonHeight.y;
-	float height = latLonHeight.z;
-	float lonrad = rad(lon);
-	float lambda = lonrad;
-	float latrad = rad(lat);
-	float phi = latrad;
-	float theta;
-	if (phi == .5 * M_PI) {
-		theta = .5 * M_PI;
-	} else {
-		theta = phi;
-		for (int i = 0; i < 10; ++i) {
-			float dtheta = (2. * theta + sin(2. * theta) - M_PI * sin(phi)) / (2. + 2. * cos(theta));
-			if (abs(dtheta) < 1e-5) break;
-			theta -= dtheta;
-		}
-	}
-	float mollweidex = Mollweide_R * M_SQRT_8 / M_PI * (lambda - Mollweide_lambda0) * cos(theta);
-	float mollweidey = Mollweide_R * M_SQRT_2 * sin(theta);
-	float mollweidez = height / WGS84_a;
-	if (!isfinite(mollweidex)) mollweidex = 0;
-	if (!isfinite(mollweidey)) mollweidey = 0;
-	if (!isfinite(mollweidez)) mollweidez = 0;
-	return vec3(mollweidex, mollweidey, mollweidez);
-}
-]]
-	self.modules:addFromMarkup(code_Mollweide)
-
-	local allChartCode = self.modules:getCodeAndHeader(
-		'chart_WGS84',
-		'chart_cylinder',
-		'chart_Equirectangular',
-		'chart_Azimuthal_equidistant',
-		'chart_Mollweide'
-	)
 
 	self.globeTexShader = GLProgram{
 		vertexCode = table{
@@ -337,10 +157,32 @@ glreport'here'
 	self.globeTexShader:useNone()
 glreport'here'
 
+	
+	local station_t_C_code = [[
+typedef struct {
+	int sensorDataOffset;	//offset into sensorData buffer
+	int numPts;	// size of buffer in sensorData buffer
+	int startTime;	// timestamp ... second-accurate, goes bad in 2038 or something
+	int endTime;	// timestamp ...
+} station_t;
+]]
+	-- glsl needs 'struct name' like C++ and not 'typedef ... name' like C
+	local station_t_GLSL_code = [[
+struct station_t {
+	int sensorDataOffset;	//offset into sensorData buffer
+	int numPts;	// size of buffer in sensorData buffer
+	int startTime;	// timestamp ... second-accurate, goes bad in 2038 or something
+	int endTime;	// timestamp ...
+};
+]]
+	
+	ffi.cdef(station_t_C_code)
+
 	self.globeStationPointShader = GLProgram{
 		vertexCode = table{
 '#version 460',
 allChartCode,
+station_t_GLSL_code,
 [[
 uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
@@ -351,16 +193,26 @@ uniform float weight_Equirectangular;
 uniform float weight_Azimuthal_equidistant;
 uniform float weight_Mollweide;
 
-uniform float playtime;
+uniform int playtime;	//timestamp
+
 uniform float pointSizeBase;
 
-uniform sampler2D dataTex;
-uniform int dataTexSize;	// == maxTextureSize
+// what is binding? other than glBindBufferBase to associate with this field?
+// and what's the difference between binding= and with 'layoutName' ?
+//   sure enough the longer alternative is to use glGetProgramResourceIndex and glShaderStorageBlockBinding to associate the buffer by layoutName instead of by binding
+// why std430 and not ... later?
+// and what is 'set=' ?
+layout(binding=2, std430) buffer SensorData {
+	float v[];
+} sensorData;
+
+layout(binding=3, std430) buffer StationData {
+	station_t v[];
+} stationData;
+
+uniform int sensorDataSize;	// == maxTextureSize
 
 in vec3 vertex;
-
-// (index, size) in the dataTex
-in ivec2 stationTexCoord;
 
 out float datav;
 
@@ -383,29 +235,23 @@ void main() {
 	//gl_PointSize = 5. * projectionMatrix[0].x;
 
 
+	int stationPixelIndex = stationData.v[gl_VertexID].sensorDataOffset;
+	int stationNumPts = stationData.v[gl_VertexID].numPts;
+	int stationStartTime = stationData.v[gl_VertexID].startTime;
+	int stationEndTime = stationData.v[gl_VertexID].endTime;
+
+	float playfrac = float(playtime - stationStartTime) / float(stationEndTime - stationStartTime);
+	
 	// get the index based on playtime
-	int index = stationTexCoord.x + int(
-		clamp(playtime, 0., 1.) 
-		* float(stationTexCoord.y-1)
-	);
-	// convert it to pixel location / channel
-	// maybe this is better in integers / as a compute shader?
-	// then I don't have to use max texture size too
-	const int numChannels = 4;
-	int ch = index % numChannels;
-	index -= ch;
-	index /= numChannels;
-	int dx = index % dataTexSize;
-	index -= dx;
-	index /= dataTexSize;
-	int dy = index;	//should be in bounds 
-	vec4 c = texture(dataTex,
-		vec2(
-			(.5 + float(dx)),
-			(.5 + float(dy))
-		) / float(dataTexSize)
-	);
-	datav = c[ch];
+	int index = stationPixelIndex + int(clamp(playfrac, 0., 1.) * float(stationNumPts - 1));
+
+	datav = sensorData.v[index % sensorDataSize];
+
+	// map to 0 thru 10 or so (however big richter scale gets)
+	datav = log(abs(datav) + 1.) / log(10.);
+
+	// TODO map to a color scale or something
+	datav *= 0.1;
 }
 ]]
 }:concat'\n',
@@ -414,7 +260,7 @@ void main() {
 in float datav;
 out vec4 fragColor;
 void main() {
-	fragColor = vec4(datav, .5, -datav, 1.);
+	fragColor = vec4(datav, 0., 1. - datav, 1.);
 }
 ]],
 		uniforms = {
@@ -434,80 +280,109 @@ glreport'here'
 			datas:insert{sacfn=fn}
 		end
 	end
+	datas:sort(function(a,b) return a.sacfn < b.sacfn end)
 
-	-- row i = datas[i], col j = time j
-	-- how to decide what size to use?
-	-- for max tex size 16384 and 288000 records we got 17.5 texture rows per record ...
-	-- so if i have to wrap data then why not just pack it and store each data in texture x and y and size
-	-- ok also if I have 288000 values at 20 hz then I have 14400 seconds worth = 240 mins = 4 hr
-	local numChannels = 4
-	local dataImageSize = maxTextureSize	-- hmm this is getting me GL_OUT_OF_MEMORY error
-	-- TODO what can I query to find the max tex memory?
-	local dataImageSize = 8192
-	local dataImage = Image(dataImageSize, dataImageSize, numChannels, 'float')
-	local indexmax = dataImageSize * dataImageSize * numChannels
-	local index = 0
 	timer('reading data', function()
-		for row,data in ipairs(datas) do
+		local totalNumPts = 0
+		for _,data in ipairs(datas) do
 			for buffer, stats in zipIter(data.sacfn) do
 				data.pts, data.hdr = readSAC(buffer, stats)
 				data.hdr = data.hdr[0]	-- ref instead of ptr
-				-- data.pts is data.hdr.npts in size
-				if index + data.hdr.npts >= indexmax then
-					error("ran out of pixels in our seismo dataImage")
-				end
-				data.pixelIndex = index
-				--[[ don't really need this.
-				local i = index
-				data.pixelChannel = i % numChannels
-				i = (i - data.pixelChannel) / numChannels
-				data.pixelX = i % dataImageSize
-				i = (i - data.pixelX) / dataImageSize
-				data.pixelY = i
-				assert(data.pixelY < dataImageSize)
-				--]]
-				ffi.copy(
-					dataImage.buffer + index,
-					data.pts,
-					ffi.sizeof'float' * data.hdr.npts)
-				index = index + data.hdr.npts
-				
-				-- get station info associated with data
-				-- use the first station
-				local sig = data.sacfn:match('^'..dataDir..'/query%-(.*)%-sac%.zip$')
-				assert(sig, "couldn't get sig from file")
-				local s = stationsForSig[sig]
-				assert(#s > 0, "couldn't find a station for sig "..sig)
-				data.station = s[1]
-
-print(data.hdr.npts, data.sacfn, data.pixelIndex)--, data.pixelChannel, data.pixelX, data.pixelY)
-				-- ok theres no VertexAttrib2i so here goes
-				-- I should just use attribpointer
-				local vec4i = require 'vec-ffi.vec4i'
-				data.stationTexCoordPtr = vec4i(
-					data.pixelIndex,
-					data.hdr.npts,
-					0,
-					0
-				)
+				totalNumPts = totalNumPts + data.hdr.npts
+				-- but wait, I'm just drawing one sensor per station, so why pick any more than one?
+				if data.hdr.npts > 0 then break end
 			end
 		end
+
+		local sensorDataPtr = ffi.new('float[?]', totalNumPts)
+		local stationDataPtr = ffi.new('station_t[?]', #datas)
+		
+		local index = 0
+		for i,data in ipairs(datas) do
+			local hdr = data.hdr
+			data.sensorDataOffset = index
+			ffi.copy(
+				sensorDataPtr + index,
+				data.pts,
+				ffi.sizeof'float' * hdr.npts)
+			index = index + hdr.npts
+			
+			-- get station info associated with data
+			-- use the first station
+			local sig = data.sacfn:match('^'..dataDir..'/query%-(.*)%-sac%.zip$')
+			assert(sig, "couldn't get sig from file")
+			local s = stationsForSig[sig]
+			assert(#s > 0, "couldn't find a station for sig "..sig)
+			data.station = s[1]
+
+			local startTime = os.time{
+				year = hdr.nzyear,
+				month = 1,
+				day = 1,
+				hour = hdr.nzhour,
+				min = hdr.nzmin,
+				sec = hdr.nzsec,
+				--msec = hdr.msec,	-- hmm, msec accurate dates ...
+			}
+				+ 60 * 60 * 24 * hdr.nzjday	-- can't use yday with os.time, only os.date, so gotta offset it here
+			-- ok so theres no end-duration ...
+			-- and i dont see a frequency or hz field ...
+			-- so how do i find the end date?
+			-- ahhh "delta" of course that means "delta-time"
+			local endTime = math.floor(startTime + hdr.delta * hdr.npts)
+			data.startTime = startTime
+			data.endTime = endTime
+
+			totalStartTime = totalStartTime and math.min(startTime, totalStartTime) or startTime
+			totalEndTime = totalEndTime and math.max(endTime, totalEndTime) or endTime
+
+print(
+	hdr.npts,
+	data.sacfn,
+	data.sensorDataOffset,
+	os.date(nil, startTime),
+	os.date(nil, endTime)
+)
+			stationDataPtr[i-1].sensorDataOffset = data.sensorDataOffset
+			stationDataPtr[i-1].numPts = hdr.npts
+			stationDataPtr[i-1].startTime = startTime
+			stationDataPtr[i-1].endTime = endTime
+
+			--[[
+			-- ok theres no VertexAttrib2i so here goes
+			--  all they have is VertexAttrib4iv 
+			-- I should just use attribpointer
+			local vec4i = require 'vec-ffi.vec4i'
+			data.stationTexCoordPtr = vec4i(
+				data.sensorDataOffset,
+				hdr.npts,
+				startTime,	-- without ms this will still overflow in 2038 (right?)
+				endTime
+			)
+			--]]
+		end
+			
+		-- ok now create the ssbo
+		self.sensorDataSSBO = GLShaderStorageBuffer{
+			size = ffi.sizeof'float' * totalNumPts,
+			data = sensorDataPtr,
+		}
+
+		self.stationDataSSBO = GLShaderStorageBuffer{
+			size = ffi.sizeof'station_t' * #datas,
+			data = stationDataPtr,
+		}
+
+		-- also I've heard enough complaints about integer attributes 
+		-- ... so I might as well use a buffer for holding it too?
+		-- and then dereference it via 
 	end)
-	--[[ this doesn't show anything useful and takes too long so ...
-	timer('writing', function()
-		dataImage:normalize():save'dataimage.png'
-	end)
-	--]]
-print('dataImage size', dataImage.width, dataImage.height)
-glreport'here'
-	self.dataTex = GLTex2D{
-		image = dataImage,
-		format = gl.GL_RGBA,
-		type = gl.GL_FLOAT,
-		internalFormat = gl.GL_RGBA32F,
-		minFilter = gl.GL_NEAREST,
-		magFilter = gl.GL_NEAREST,
-	}
+	assert(index == totalNumPts)
+	print('got '..#datas..' pts')
+	playtime = totalStartTime
+print'total time range:'
+print('from:', os.date(nil, totalStartTime))
+print('end:', os.date(nil, totalEndTime))
 glreport'here'
 	GLTex2D:unbind()
 glreport'here'
@@ -522,7 +397,7 @@ equirectCoeff = 1
 aziequiCoeff = 0
 mollweideCoeff = 0
 playtime = 0
-playSpeed = 1
+playSpeed = 60 * 60
 playing = false
 pointSizeBase = 5
 
@@ -583,22 +458,29 @@ function App:update()
 		weight_Mollweide = mollweideCoeff,
 		modelViewMatrix = self.modelViewMatrix.ptr,
 		projectionMatrix = self.projectionMatrix.ptr,
-		playtime = playtime,
 		pointSizeBase = pointSizeBase,
 	}
-	self.dataTex:bind()
 	gl.glDepthMask(gl.GL_FALSE)
 	gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE)
 	-- ok not all stations have data associated with them ...
 	-- maybe I should be cycling thru the data, and then lining up data with stations with lat/lon
-	gl.glUniform1i(self.globeStationPointShader.uniforms.dataTexSize.loc, self.dataTex.width)
+	if self.globeStationPointShader.uniforms.playtime then
+		gl.glUniform1i(self.globeStationPointShader.uniforms.playtime.loc, playtime)
+	end
+	if self.globeStationPointShader.uniforms.sensorDataSize then
+		gl.glUniform1i(self.globeStationPointShader.uniforms.sensorDataSize.loc, self.sensorDataSSBO.size)
+	end
+	
+	self.sensorDataSSBO:bind()
+	self.sensorDataSSBO:bindBase(2)	-- matches GLSL 'sensorData' binding=
+	self.sensorDataSSBO:unbind()
+	self.stationDataSSBO:bind()
+	self.stationDataSSBO:bindBase(3)
+	self.stationDataSSBO:unbind()
+	
 	gl.glBegin(gl.GL_POINTS)
 	-- [[ draw only the data sensors
 	for _,d in ipairs(datas) do
-		gl.glVertexAttrib4iv(
-			self.globeStationPointShader.attrs.stationTexCoord.loc,
-			d.stationTexCoordPtr.s
-		)
 		local s = d.station
 		gl.glVertexAttrib3f(
 			self.globeStationPointShader.attrs.vertex.loc,
@@ -623,14 +505,14 @@ function App:update()
 	gl.glDepthMask(gl.GL_TRUE)
 	gl.glDisable(gl.GL_VERTEX_PROGRAM_POINT_SIZE)
 	
-	self.dataTex:unbind()
 	self.globeStationPointShader:useNone()
 --]==]
 
 	if playing then
-		playtime = playtime + dt * playSpeed
-		if playtime > 1 then
-			playtime = 0
+		local deltaPlayTime = dt * playSpeed
+		playtime = playtime + deltaPlayTime 
+		if playtime > totalEndTime then
+			playtime = totalEndTime
 			playing = false
 		end
 	end
@@ -682,7 +564,13 @@ function App:updateGUI()
 			end
 		end
 	end
-	ig.luatableInputFloat('play speed', _G, 'playSpeed')
+	ig.luatableInputFloat('pointSizeBase', _G, 'pointSizeBase')
+	
+	ig.igText('start: '..totalStartTime)
+	ig.igText(os.date(nil, totalStartTime))
+	ig.igText('end: '..totalEndTime)
+	ig.igText(os.date(nil, totalEndTime))
+
 	if playing then
 		if ig.igButton'stop' then
 			playing = false
@@ -690,11 +578,49 @@ function App:updateGUI()
 	else
 		if ig.igButton'play' then
 			playing = true
+			if playtime == totalEndTime then
+				playtime = totalStartTime
+			end
 		end
 	end
-	ig.igSameLine()
-	ig.luatableInputFloat('play time', _G, 'playtime')
-	ig.luatableInputFloat('pointSizeBase', _G, 'pointSizeBase')
+	
+	-- how come this is resetting the variable?
+	local oldplaytime = playtime
+	if not ig.luatableInputFloat('play time', _G, 'playtime') then
+		playtime = oldplaytime
+	end
+	ig.igText('cur: '..os.date(nil, math.floor(playtime)))
+	ig.luatableInputFloat('play speed', _G, 'playSpeed')
+end
+
+
+local function canHandleMouse()
+	if not mouse then return false end
+	if rawget(ig, 'disabled') then return true end
+	return not ig.igGetIO()[0].WantCaptureMouse
+end
+
+local function canHandleKeyboard()
+	if rawget(ig, 'disabled') then return true end
+	return not ig.igGetIO()[0].WantCaptureKeyboard
+end
+
+function App:event(event, ...)
+	if App.super.event then
+		App.super.event(self, event, ...)
+	end
+	if event.type == sdl.SDL_KEYDOWN then
+		if canHandleKeyboard() then
+			if event.key.keysym.sym == sdl.SDLK_SPACE then
+				playing = not playing
+				if playing then
+					if playtime == totalEndTime then
+						playtime = totalStartTime
+					end
+				end
+			end
+		end
+	end
 end
 
 App():run()
