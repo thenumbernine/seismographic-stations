@@ -22,6 +22,10 @@ And from there the station XML info will have the number of channels ... but whe
 And isn't channel requesting using some 3-letter/number acronym?  How do we query that, especially when we have over 1000 channels according to the "TotalNumberChannels" field?
 Whoever made this, you can tell, never worked with data in the past.
 
+# Reference
+
+- earth pic is from NASA blue marbel
+
 # Dependencies
 
 - `lua-ext`
