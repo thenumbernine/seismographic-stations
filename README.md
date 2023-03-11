@@ -24,7 +24,7 @@ Whoever made this, you can tell, never worked with data in the past.
 
 # Reference
 
-- earth pic is from NASA blue marbel
+- earth pic is from NASA blue marble https://visibleearth.nasa.gov/collection/1484/blue-marble
 
 # Dependencies
 
