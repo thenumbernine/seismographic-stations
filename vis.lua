@@ -17,7 +17,6 @@ matrix_ffi.real = 'float'	-- default matrix_ffi type
 
 local charts = require 'geographic-charts'
 local allChartCode = require 'geographic-charts.code'
-local wgs84 = charts.WGS84
 
 local readSAC = require 'readsac'
 local zipIter = require 'zipiter'
@@ -121,7 +120,7 @@ void main() {
 			+ weight_Equirectangular * chart_Equirectangular(vertex)
 			+ weight_Azimuthal_equidistant * chart_Azimuthal_equidistant(vertex)
 			+ weight_Mollweide * chart_Mollweide(vertex);
-
+	pos /= WGS84_a;
 	gl_Position = projectionMatrix * (modelViewMatrix * vec4(pos, 1.));
 	colorv = color;
 
@@ -225,6 +224,7 @@ void main() {
 			+ weight_Equirectangular * chart_Equirectangular(vertex)
 			+ weight_Azimuthal_equidistant * chart_Azimuthal_equidistant(vertex)
 			+ weight_Mollweide * chart_Mollweide(vertex);
+	pos /= WGS84_a;
 	gl_Position = projectionMatrix * (modelViewMatrix * vec4(pos, 1.));
 
 
