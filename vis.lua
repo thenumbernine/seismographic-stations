@@ -9,6 +9,7 @@ local GLProgram = require 'gl.program'
 local GLShaderStorageBuffer = require 'gl.shaderstoragebuffer'
 local glreport = require 'gl.report'
 local ig = require 'imgui'
+local Zip = require 'zip'
 local Image = require 'image'
 local sdl = require 'ffi.sdl'
 
@@ -19,7 +20,6 @@ local charts = require 'geographic-charts'
 local allChartCode = require 'geographic-charts.code'
 
 local readSAC = require 'readsac'
-local zipIter = require 'zipiter'
 
 local stations = require 'get-stations'
 local stationsForSig = {}
@@ -285,8 +285,9 @@ glreport'here'
 	timer('reading data', function()
 		local totalNumPts = 0
 		for _,data in ipairs(datas) do
-			for buffer, stats in zipIter(data.sacfn) do
-				local sac = readSAC(buffer, stats)
+			for zipref in Zip(data.sacfn):dir() do
+				local buffer, attr = zipref:read()
+				local sac = readSAC(buffer, attr.size, attr.name)
 				-- TODO use 'sac' as the obj so i have its metamethods based on .hdr
 				data.pts = sac.data
 				data.hdr = sac.hdr[0]	-- ref instead of ptr

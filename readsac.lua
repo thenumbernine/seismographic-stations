@@ -2,9 +2,8 @@
 local ffi = require 'ffi'
 local sacformat = require 'sacformat'
 
-local function readSAC(buffer, stats)
-	local bufferSize = stats[0].size
---print('file '..ffi.string(stats[0].name)..' size '..tostring(bufferSize))
+local function readSAC(buffer, bufferSize, name)
+--print('file '..ffi.string(name)..' size '..tostring(bufferSize))
 	-- now decode this horrible file format somehow and plot what we find
 	-- going by https://github.com/iris-edu/sac2mseed/blob/master/src/sac2mseed.c for how to read a SAC file
 	-- I'm going to skip the override-format and skip the ascii-format options in it

@@ -28,8 +28,9 @@ Whoever made this, you can tell, never worked with data in the past.
 
 # Dependencies
 
-- `lua-ext`
-- `lua-imguiapp`
-- `lua-imgui`
+- my `lua-ext`
+- my `lua-imguiapp`
+- my `lua-imgui`
+- my `lua-zip`
+- my `geographic-charts`
 - `luasocket` for getting the data
-- `geographic-charts`
