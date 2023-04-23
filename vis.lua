@@ -286,7 +286,7 @@ glreport'here'
 		local totalNumPts = 0
 		for _,data in ipairs(datas) do
 			for zipref in Zip(data.sacfn):dir() do
-				local buffer, attr = zipref:read()
+				local buffer, attr = zipref:readbuf()
 				local sac = readSAC(buffer, attr.size, attr.name)
 				-- TODO use 'sac' as the obj so i have its metamethods based on .hdr
 				data.pts = sac.data
