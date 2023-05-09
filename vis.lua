@@ -158,7 +158,7 @@ glreport'here'
 
 	
 	local station_t_C_code = [[
-typedef struct {
+typedef struct station_t {
 	int sensorDataOffset;	//offset into sensorData buffer
 	int numPts;	// size of buffer in sensorData buffer
 	int startTime;	// timestamp ... second-accurate, goes bad in 2038 or something
