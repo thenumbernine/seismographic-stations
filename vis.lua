@@ -612,4 +612,4 @@ function App:event(event, ...)
 	end
 end
 
-App():run()
+return App():run()
