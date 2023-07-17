@@ -2,7 +2,7 @@
 -- right now this is used for downloading seismo data
 
 local tolua = require 'ext.tolua'
-local file = require 'ext.file'
+local path = require 'ext.path'
 local table = require 'ext.table'
 local string = require 'ext.string'
 
@@ -98,7 +98,7 @@ local function tourldate(t)
 	return os.date('%Y-%m-%dT%H:%M:%S', t)..'.000'
 end
 
-file'data':mkdir()
+path'data':mkdir()
 for _,k in ipairs(table.keys(stationsForSig):sort()) do
 	local ss = stationsForSig[k]
 	for _,s in ipairs(ss) do

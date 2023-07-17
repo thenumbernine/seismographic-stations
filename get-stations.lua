@@ -1,5 +1,5 @@
 #!/usr/bin/env lua
-local file = require 'ext.file'
+local path = require 'ext.path'
 local fromlua = require 'ext.fromlua'
 local tolua = require 'ext.tolua'
 local string = require 'ext.string'
@@ -7,9 +7,9 @@ local table = require 'ext.table'
 local geturl = require 'geturl'
 local irisurl = require 'irisurl'
 
-file'luon':mkdir()
-file'txt':mkdir()
-file'xml':mkdir()
+path'luon':mkdir()
+path'txt':mkdir()
+path'xml':mkdir()
 
 -- this interprets the file too
 -- it assumes the first row is # with fields | separated
@@ -18,8 +18,8 @@ file'xml':mkdir()
 local function gettextdata(basename, url)
 	local luonname = 'luon/'..basename..'.luon'	-- ok this is just a lua object.  idk if its really LUON, cuz i think that used binary or something.
 	local rows
-	if file(luonname):exists() then
-		rows = setmetatable(assert(fromlua(file(luonname):read())), table)
+	if path(luonname):exists() then
+		rows = setmetatable(assert(fromlua(path(luonname):read())), table)
 	else
 		local d = geturl('txt/'..basename..'.txt', url)
 		rows = string.split(d, '\n')
@@ -38,7 +38,7 @@ local function gettextdata(basename, url)
 				-- :mapi(function(v) return string.trim(v) end)
 				:mapi(function(v,i) return v, assert(keys[i]) end)
 		end)
-		file(luonname):write(tolua(rows))
+		path(luonname):write(tolua(rows))
 	end
 	return rows
 end
@@ -46,8 +46,8 @@ end
 -- using this insead cuz IRIS is made by boomers still living in the 90s who still use XML
 local function getxmldata(basename, url)
 	local luonname = 'luon/'..basename..'.luon'
-	if file(luonname):exists() then
-		return setmetatable(assert(fromlua(file(luonname):read())), table)
+	if path(luonname):exists() then
+		return setmetatable(assert(fromlua(path(luonname):read())), table)
 	else
 		local xml2lua = require 'xml2lua'
 		local xmlhandler = require 'xmlhandler.tree'
@@ -56,7 +56,7 @@ local function getxmldata(basename, url)
 		local parser = xml2lua.parser(handler)
 		parser:parse(d)
 		local objs = handler.root 
-		file(luonname):write(tolua(objs))
+		path(luonname):write(tolua(objs))
 		return objs
 	end
 end

@@ -1,19 +1,19 @@
-local file = require 'ext.file'
+local path = require 'ext.path'
 
 -- this just caches a file or downloads it
 local function geturl(fn, url)
-	if file(fn):exists() then 
-		return file(fn):read()
+	if path(fn):exists() then 
+		return path(fn):read()
 	end
 	print('downloading '..fn..' from '..url)
 	-- [[ pure lua.  no output.
 	local http = require 'socket.http'
 	local d = assert(http.request(url))
-	assert(file(fn):write(d))
+	assert(path(fn):write(d))
 	--]]
 	--[[ use wget.  nice animation.
 	assert(os.execute('wget -O "'..fn..'" "'..url..'"'))
-	local d = file(fn):read()
+	local d = path(fn):read()
 	--]]
 	return d
 end

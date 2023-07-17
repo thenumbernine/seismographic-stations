@@ -2,7 +2,7 @@
 local ffi = require 'ffi'
 local table = require 'ext.table'
 local timer = require 'ext.timer'
-local file = require 'ext.file'
+local path = require 'ext.path'
 local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
@@ -273,9 +273,9 @@ glreport'here'
 
 	datas = table()
 	local dataDir = 'data'
-	for f in file(dataDir):dir() do
+	for f in path(dataDir):dir() do
 		local fn = dataDir..'/'..f
-		local size = file(fn):attr().size
+		local size = path(fn):attr().size
 		if size > 0 then
 			datas:insert{sacfn=fn}
 		end

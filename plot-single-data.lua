@@ -5,7 +5,7 @@
 local table = require 'ext.table'
 local range = require 'ext.range'
 local timer = require 'ext.timer'
-local file = require 'ext.file'
+local path = require 'ext.path'
 local readSAC = require 'readsac'
 local gnuplot = require 'gnuplot'
 local zipIter = require 'zipiter'
@@ -26,9 +26,9 @@ local dataDir = 'data'
 local fn = ...
 if not fn then
 	print("here's all your possible files:")
-	for f in file(dataDir):dir() do
+	for f in path(dataDir):dir() do
 		local fn = dataDir..'/'..f
-		local size = file(fn):attr().size
+		local size = path(fn):attr().size
 		if size > 0 then
 			print(size, fn)
 		end
@@ -36,7 +36,7 @@ if not fn then
 	return
 end
 
-if file(fn):attr().size == 0 then
+if path(fn):attr().size == 0 then
 	error("file has no size")
 end
 
