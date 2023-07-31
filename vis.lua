@@ -11,7 +11,7 @@ local glreport = require 'gl.report'
 local ig = require 'imgui'
 local Zip = require 'zip'
 local Image = require 'image'
-local sdl = require 'ffi.sdl'
+local sdl = require 'ffi.req' 'sdl'
 
 local matrix_ffi = require 'matrix.ffi'
 matrix_ffi.real = 'float'	-- default matrix_ffi type
