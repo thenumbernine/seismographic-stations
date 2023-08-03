@@ -355,12 +355,12 @@ print(
 		self.sensorDataSSBO = GLShaderStorageBuffer{
 			size = ffi.sizeof'float' * totalNumPts,
 			data = sensorDataPtr,
-		}
+		}:unbind()
 
 		self.stationDataSSBO = GLShaderStorageBuffer{
 			size = ffi.sizeof'station_t' * #datas,
 			data = stationDataPtr,
-		}
+		}:unbind()
 
 		-- also I've heard enough complaints about integer attributes 
 		-- ... so I might as well use a buffer for holding it too?
@@ -460,12 +460,14 @@ function App:update()
 		gl.glUniform1i(self.globeStationPointShader.uniforms.sensorDataSize.loc, self.sensorDataSSBO.size)
 	end
 	
-	self.sensorDataSSBO:bind()
-	self.sensorDataSSBO:bindBase(2)	-- matches GLSL 'sensorData' binding=
-	self.sensorDataSSBO:unbind()
-	self.stationDataSSBO:bind()
-	self.stationDataSSBO:bindBase(3)
-	self.stationDataSSBO:unbind()
+	self.sensorDataSSBO
+		:bind()
+		:bindBase(2)	-- matches GLSL 'sensorData' binding=
+		:unbind()
+	self.stationDataSSBO
+		:bind()
+		:bindBase(3)
+		:unbind()
 	
 	gl.glBegin(gl.GL_POINTS)
 	-- [[ draw only the data sensors
