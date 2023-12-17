@@ -272,12 +272,13 @@ glreport'here'
 glreport'here'
 
 	datas = table()
-	local dataDir = 'data'
-	for f in path(dataDir):dir() do
-		local fn = dataDir..'/'..f
-		local size = path(fn):attr().size
+	local dataDir = path'data'
+	-- iter returns Paths, cuz ext lib
+	for f in dataDir:dir() do
+		local fn = dataDir/f
+		local size = fn:attr().size
 		if size > 0 then
-			datas:insert{sacfn=fn}
+			datas:insert{sacfn=fn.path}
 		end
 	end
 	datas:sort(function(a,b) return a.sacfn < b.sacfn end)
@@ -285,6 +286,7 @@ glreport'here'
 	timer('reading data', function()
 		local totalNumPts = 0
 		for _,data in ipairs(datas) do
+			-- iter returns strings, cuz zip lib
 			for zipref in Zip(data.sacfn):dir() do
 				local buffer, attr = zipref:readbuf()
 				local sac = readSAC(buffer, attr.size, attr.name)

@@ -21,14 +21,14 @@ for _,s in ipairs(stations) do
 	stationsForSig[k]:insert(s)
 end
 
-local dataDir = 'data'
+local dataDir = path'data'
 
 local fn = ...
 if not fn then
 	print("here's all your possible files:")
-	for f in path(dataDir):dir() do
-		local fn = dataDir..'/'..f
-		local size = path(fn):attr().size
+	for f in dataDir:dir() do
+		local fn = dataDir/f
+		local size = fn:attr().size
 		if size > 0 then
 			print(size, fn)
 		end
