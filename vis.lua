@@ -16,7 +16,7 @@ local sdl = require 'ffi.req' 'sdl'
 local matrix_ffi = require 'matrix.ffi'
 matrix_ffi.real = 'float'	-- default matrix_ffi type
 
-local charts = require 'geographic-charts'
+local charts = require 'geographic-charts.buildall'
 local allChartCode = require 'geographic-charts.code'
 
 local readSAC = require 'readsac'
