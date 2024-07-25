@@ -17,7 +17,7 @@ local matrix_ffi = require 'matrix.ffi'
 matrix_ffi.real = 'float'	-- default matrix_ffi type
 
 local charts = require 'geographic-charts.buildall'
-local allChartCode = require 'geographic-charts.code'
+local allChartCode = require 'geographic-charts.code'(charts)
 
 local readSAC = require 'readsac'
 
@@ -92,8 +92,9 @@ glreport'here'
 	self.projectionMatrix = matrix_ffi.zeros{4,4}
 
 	self.globeTexShader = GLProgram{
+		version = 'latest',
+		precision = 'best',
 		vertexCode = table{
-'#version 460',
 allChartCode,
 [[
 uniform mat4 modelViewMatrix;
@@ -139,7 +140,6 @@ void main() {
 ]]
 }:concat'\n',
 		fragmentCode = [[
-#version 460
 uniform sampler2D colorTex;
 in vec4 colorv;
 in vec2 texcoordv;
@@ -178,8 +178,9 @@ struct station_t {
 	ffi.cdef(station_t_C_code)
 
 	self.globeStationPointShader = GLProgram{
+		version = 'latest',
+		precision = 'best',
 		vertexCode = table{
-'#version 460',
 allChartCode,
 station_t_GLSL_code,
 [[
@@ -256,7 +257,6 @@ void main() {
 ]]
 }:concat'\n',
 		fragmentCode = [[
-#version 460
 in float datav;
 out vec4 fragColor;
 void main() {
