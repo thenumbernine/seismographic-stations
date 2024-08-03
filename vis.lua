@@ -602,9 +602,9 @@ function App:event(event, ...)
 	if App.super.event then
 		App.super.event(self, event, ...)
 	end
-	if event.type == sdl.SDL_KEYDOWN then
+	if event[0].type == sdl.SDL_KEYDOWN then
 		if canHandleKeyboard() then
-			if event.key.keysym.sym == sdl.SDLK_SPACE then
+			if event[0].key.keysym.sym == sdl.SDLK_SPACE then
 				playing = not playing
 				if playing then
 					if playtime == totalEndTime then
