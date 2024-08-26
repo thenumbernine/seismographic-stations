@@ -30,7 +30,7 @@ for _,s in ipairs(stations) do
 end
 
 local App = require 'imguiapp.withorbit'()
-
+App.viewUseGLMatrixMode = true
 App.title = 'seismograph stations'
 App.viewDist = 1.6
 App.viewOrthoSize = 2	-- TODO assign in glapp.view
