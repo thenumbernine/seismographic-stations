@@ -11,7 +11,7 @@ local glreport = require 'gl.report'
 local ig = require 'imgui'
 local Zip = require 'zip'
 local Image = require 'image'
-local sdl = require 'ffi.req' 'sdl'
+local sdl = require 'sdl'
 
 local matrix_ffi = require 'matrix.ffi'
 matrix_ffi.real = 'float'	-- default matrix_ffi type
@@ -29,7 +29,7 @@ for _,s in ipairs(stations) do
 	stationsForSig[k]:insert(s)
 end
 
-local App = require 'imguiapp.withorbit'()
+local App = require 'imgui.appwithorbit'()
 App.viewUseGLMatrixMode = true
 App.title = 'seismograph stations'
 App.viewDist = 1.6
@@ -602,9 +602,9 @@ function App:event(event, ...)
 	if App.super.event then
 		App.super.event(self, event, ...)
 	end
-	if event[0].type == sdl.SDL_KEYDOWN then
+	if event[0].type == sdl.SDL_EVENT_KEY_DOWN then
 		if canHandleKeyboard() then
-			if event[0].key.keysym.sym == sdl.SDLK_SPACE then
+			if event[0].key.key == sdl.SDLK_SPACE then
 				playing = not playing
 				if playing then
 					if playtime == totalEndTime then
