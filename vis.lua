@@ -3,6 +3,7 @@ local ffi = require 'ffi'
 local table = require 'ext.table'
 local timer = require 'ext.timer'
 local path = require 'ext.path'
+local vec4x4f = require 'vec-ffi.vec4x4f'
 local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
@@ -12,9 +13,6 @@ local ig = require 'imgui'
 local Zip = require 'zip'
 local Image = require 'image'
 local sdl = require 'sdl'
-
-local matrix_ffi = require 'matrix.ffi'
-matrix_ffi.real = 'float'	-- default matrix_ffi type
 
 local charts = require 'geographic-charts.buildall'
 local allChartCode = require 'geographic-charts.code'(charts)
@@ -88,8 +86,8 @@ glreport'here'
 	GLTex2D:unbind()
 glreport'here'
 
-	self.modelViewMatrix = matrix_ffi.zeros{4,4}
-	self.projectionMatrix = matrix_ffi.zeros{4,4}
+	self.modelViewMatrix = vec4x4f()
+	self.projectionMatrix = vec4x4f()
 
 	self.globeTexShader = GLProgram{
 		version = 'latest',

@@ -1,0 +1,31 @@
+--------------------------------------------
+-- generated with dist/build-distinfo.rua --
+--------------------------------------------
+
+name = "seismograph-visualization"
+files = {
+	"README.md",
+	"earth-color.png",
+	"get-data.lua",
+	"get-stations.lua",
+	"geturl.lua",
+	"irisurl.lua",
+	"plot-single-data.lua",
+	"plot.gnuplot",
+	"readsac.lua",
+	"sacformat.lua",
+	"sensor-locations.png",
+	"vis.lua",
+}
+deps = {
+	"ext",
+	"geographic-charts",
+	"gl",
+	"gnuplot",
+	"image",
+	"imgui",
+	"matrix",
+	"sdl",
+	"vec-ffi",
+	"zip",
+}
