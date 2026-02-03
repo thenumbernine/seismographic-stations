@@ -26,6 +26,7 @@ deps = {
 	"imgui",
 	"matrix",
 	"sdl",
+	"url",
 	"vec-ffi",
 	"zip",
 }
