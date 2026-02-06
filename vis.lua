@@ -8,7 +8,6 @@ local gl = require 'gl'
 local GLTex2D = require 'gl.tex2d'
 local GLProgram = require 'gl.program'
 local GLShaderStorageBuffer = require 'gl.shaderstoragebuffer'
-local glreport = require 'gl.report'
 local ig = require 'imgui'
 local Zip = require 'zip'
 local Image = require 'image'
@@ -75,16 +74,13 @@ function App:initGL(...)
 		end)
 	end
 
-glreport'here'
 	self.colorTex = GLTex2D{
 		image = image,
 		minFilter = gl.GL_LINEAR,
 		magFilter = gl.GL_LINEAR,
 		generateMipmap = true,
 	}
-glreport'here'
 	GLTex2D:unbind()
-glreport'here'
 
 	self.modelViewMatrix = vec4x4f()
 	self.projectionMatrix = vec4x4f()
@@ -150,9 +146,7 @@ void main() {
 			colorTex = 0,
 		},
 	}
-glreport'here'
 	self.globeTexShader:useNone()
-glreport'here'
 
 	
 	local station_t_C_code = [[
@@ -265,9 +259,7 @@ void main() {
 			dataTex = 0,
 		},
 	}
-glreport'here'
 	self.globeStationPointShader:useNone()
-glreport'here'
 
 	datas = table()
 	local dataDir = path'data'
@@ -372,9 +364,7 @@ print(
 print'total time range:'
 print('from:', os.date(nil, totalStartTime))
 print('end:', os.date(nil, totalEndTime))
-glreport'here'
 	GLTex2D:unbind()
-glreport'here'
 end
 
 idivs = 100
@@ -509,7 +499,6 @@ function App:update()
 	end
 
 	App.super.update(self)
-glreport'here'
 end
 
 local weightFields = {
